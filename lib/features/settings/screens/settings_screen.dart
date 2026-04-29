@@ -19,6 +19,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _ipController = TextEditingController();
+  final _portController = TextEditingController();
   final _budgetController = TextEditingController();
   TimeOfDay _autoOffTime = const TimeOfDay(hour: 7, minute: 0);
   
@@ -32,6 +33,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _ipController.text = prefs.getString('mqtt_broker_ip') ?? '192.168.1.100';
+      _portController.text = (prefs.getInt('mqtt_broker_port') ?? 1883).toString();
       _budgetController.text = (prefs.getDouble('monthly_budget') ?? 500.0).toString();
       final hour = prefs.getInt('auto_off_hour') ?? 7;
       final minute = prefs.getInt('auto_off_minute') ?? 0;
@@ -39,16 +41,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
   }
 
-  Future<void> _updateBrokerIp() async {
+  Future<void> _updateBrokerConfig() async {
     final ip = _ipController.text.trim();
+    final port = int.tryParse(_portController.text.trim()) ?? 1883;
+    
     if (_isValidIp(ip)) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('mqtt_broker_ip', ip);
+      await prefs.setInt('mqtt_broker_port', port);
       
       // Trigger reconnect
       ref.read(mqttServiceProvider).connect();
       
-      _showSnackbar('Broker IP updated', isError: false);
+      _showSnackbar('MQTT Configuration updated', isError: false);
     } else {
       _showSnackbar('Invalid IP address format', isError: true);
     }
@@ -109,12 +114,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               [
                 TextField(
                   controller: _ipController,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Broker IP Address',
+                    labelStyle: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  style: const TextStyle(color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _portController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Broker Port',
                     labelStyle: const TextStyle(color: AppColors.textSecondary),
                     suffixIcon: IconButton(
                       icon: const Icon(Icons.save, color: AppColors.primaryBlue),
-                      onPressed: _updateBrokerIp,
+                      onPressed: _updateBrokerConfig,
                     ),
                   ),
                   style: const TextStyle(color: AppColors.textPrimary),

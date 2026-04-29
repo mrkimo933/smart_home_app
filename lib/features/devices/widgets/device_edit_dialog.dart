@@ -18,11 +18,13 @@ class DeviceEditDialog extends ConsumerStatefulWidget {
 class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
   late TextEditingController _nameController;
   late TextEditingController _wattageController;
-  late String _selectedIcon;
-  late DevicePriority _priority;
-  late int _selectedRelay;
+  String _selectedIcon = 'lamp';
+  DevicePriority _priority = DevicePriority.normal;
+  int _selectedRelay = 1;
 
-  final List<String> _icons = ['lamp', 'ac', 'tv', 'fan', 'fridge', 'washer', 'pc', 'router', 'heater', 'microwave'];
+  final List<String> _icons = [
+    'lamp', 'ac', 'tv', 'fan', 'fridge', 'washer', 'pc', 'router', 'heater', 'microwave', 'water_heater', 'coffee_maker'
+  ];
 
   @override
   void initState() {
@@ -43,54 +45,82 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: AppColors.cardColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: Text(widget.device == null ? 'Add Device' : 'Edit Device', style: const TextStyle(color: AppColors.textPrimary)),
-      content: SingleChildScrollView(
+    return Container(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      decoration: const BoxDecoration(
+        color: AppColors.cardColor,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Device Name',
-                labelStyle: TextStyle(color: AppColors.textSecondary),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-              style: const TextStyle(color: AppColors.textPrimary),
+            ),
+            Text(
+              widget.device == null ? 'Add New Device' : 'Edit Device',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            _buildTextField(
+              controller: _nameController,
+              label: 'Device Name',
+              icon: Icons.label_important_outline_rounded,
+            ),
+            const SizedBox(height: 20),
+            _buildTextField(
+              controller: _wattageController,
+              label: 'Wattage (W)',
+              icon: Icons.bolt_rounded,
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 32),
+            const Text(
+              'Select Icon',
+              style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 16),
-            TextField(
-              controller: _wattageController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Wattage (W)',
-                labelStyle: TextStyle(color: AppColors.textSecondary),
-                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
-              ),
-              style: const TextStyle(color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 24),
-            const Text('Icon', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-            const SizedBox(height: 8),
             SizedBox(
-              height: 50,
-              child: ListView.builder(
+              height: 120,
+              child: GridView.builder(
                 scrollDirection: Axis.horizontal,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                ),
                 itemCount: _icons.length,
                 itemBuilder: (context, index) {
                   final icon = _icons[index];
                   final isSelected = _selectedIcon == icon;
                   return GestureDetector(
                     onTap: () => setState(() => _selectedIcon = icon),
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.all(8),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primaryBlue : Colors.white10,
-                        borderRadius: BorderRadius.circular(12),
+                        color: isSelected ? AppColors.primaryBlue : Colors.white.withAlpha((0.05 * 255).toInt()),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected ? Colors.white30 : Colors.transparent,
+                        ),
                       ),
                       child: _buildIcon(icon, isSelected),
                     ),
@@ -98,137 +128,244 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
                 },
               ),
             ),
-            const SizedBox(height: 24),
-            const Text('Priority', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            const SizedBox(height: 32),
+            const Text(
+              'Priority Level',
+              style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 16),
             Row(
               children: [
-                _priorityChip(DevicePriority.essential, 'Essential'),
-                _priorityChip(DevicePriority.normal, 'Normal'),
-                _priorityChip(DevicePriority.nonEssential, 'Low'),
+                _priorityChip(DevicePriority.essential, 'Essential', Icons.priority_high_rounded),
+                const SizedBox(width: 12),
+                _priorityChip(DevicePriority.normal, 'Normal', Icons.check_circle_outline_rounded),
+                const SizedBox(width: 12),
+                _priorityChip(DevicePriority.nonEssential, 'Low', Icons.low_priority_rounded),
               ],
             ),
-            const SizedBox(height: 24),
-            const Text('Relay ID', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [1, 2, 3, 4].map((id) {
-                final isSelected = _selectedRelay == id;
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedRelay = id),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppColors.primaryBlue : Colors.white10,
-                      borderRadius: BorderRadius.circular(12),
+            const SizedBox(height: 32),
+            const Text(
+              'Relay ID (1-8)',
+              style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 100,
+              child: GridView.count(
+                crossAxisCount: 2,
+                scrollDirection: Axis.horizontal,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                children: [1, 2, 3, 4, 5, 6, 7, 8].map((id) {
+                  final isSelected = _selectedRelay == id;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedRelay = id),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primaryBlue : Colors.white.withAlpha((0.05 * 255).toInt()),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected ? Colors.white30 : Colors.transparent,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          id.toString(),
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white38,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
                     ),
-                    child: Text(
-                      id.toString(),
-                      style: TextStyle(color: isSelected ? Colors.white : AppColors.textSecondary),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 48),
+            Row(
+              children: [
+                if (widget.device != null) ...[
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _handleDelete(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent.withAlpha((0.1 * 255).toInt()),
+                        foregroundColor: Colors.redAccent,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        side: const BorderSide(color: Colors.redAccent),
+                      ),
+                      child: const Text('Delete'),
                     ),
                   ),
-                );
-              }).toList(),
+                  const SizedBox(width: 16),
+                ],
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: _handleSave,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      elevation: 8,
+                      shadowColor: AppColors.primaryBlue.withAlpha((0.5 * 255).toInt()),
+                    ),
+                    child: Text(
+                      widget.device == null ? 'Add Device' : 'Save Changes',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-        ),
-        if (widget.device != null)
-           TextButton(
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Delete Device?'),
-                  content: const Text('Are you sure you want to delete this device?'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
-                    TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Yes')),
-                  ],
-                ),
-              );
-              if (confirm == true) {
-                ref.read(devicesProvider.notifier).deleteDevice(widget.device!.id);
-                if (mounted) Navigator.pop(context);
-              }
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
-          ),
-        ElevatedButton(
-          onPressed: () {
-            if (widget.device == null) {
-              final newDevice = Device(
-                id: 0, // Assigned by notifier
-                name: _nameController.text,
-                wattage: double.tryParse(_wattageController.text) ?? 0,
-                icon: _selectedIcon,
-                isOn: false,
-                priority: _priority,
-                totalOnMinutesToday: 0,
-                relayId: _selectedRelay,
-              );
-              ref.read(devicesProvider.notifier).addDevice(newDevice);
-            } else {
-              final updated = widget.device!.copyWith(
-                name: _nameController.text,
-                wattage: double.tryParse(_wattageController.text) ?? 100.0,
-                icon: _selectedIcon,
-                priority: _priority,
-                relayId: _selectedRelay,
-              );
-              ref.read(devicesProvider.notifier).updateDevice(updated);
-            }
-            Navigator.pop(context);
-          },
-          child: Text(widget.device == null ? 'Add' : 'Save'),
-        ),
-      ],
     );
   }
 
-  Widget _priorityChip(DevicePriority priority, String label) {
-    final isSelected = _priority == priority;
-    return GestureDetector(
-      onTap: () => setState(() => _priority = priority),
-      child: Container(
-        margin: const EdgeInsets.only(top: 8, right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryBlue.withAlpha((0.2 * 255).toInt()) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: isSelected ? AppColors.primaryBlue : Colors.white10),
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white38),
+        prefixIcon: Icon(icon, color: AppColors.primaryBlue, size: 22),
+        fillColor: Colors.white.withAlpha((0.05 * 255).toInt()),
+        filled: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? AppColors.primaryBlue : AppColors.textSecondary,
-            fontSize: 12,
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1),
+        ),
+      ),
+    );
+  }
+
+  void _handleSave() {
+    if (_nameController.text.isEmpty || _wattageController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields')),
+      );
+      return;
+    }
+
+    final double wattage = double.tryParse(_wattageController.text) ?? 0;
+
+    if (widget.device == null) {
+      final newDevice = Device(
+        id: DateTime.now().millisecondsSinceEpoch, // Use timestamp for unique ID
+        name: _nameController.text,
+        wattage: wattage,
+        icon: _selectedIcon,
+        isOn: false,
+        priority: _priority,
+        totalOnMinutesToday: 0,
+        relayId: _selectedRelay,
+      );
+      ref.read(devicesProvider.notifier).addDevice(newDevice);
+    } else {
+      final updated = widget.device!.copyWith(
+        name: _nameController.text,
+        wattage: wattage,
+        icon: _selectedIcon,
+        priority: _priority,
+        relayId: _selectedRelay,
+      );
+      ref.read(devicesProvider.notifier).updateDevice(updated);
+    }
+    Navigator.pop(context);
+  }
+
+  Future<void> _handleDelete(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Device?', style: TextStyle(color: Colors.white)),
+        content: const Text('Are you sure you want to delete this device?', style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      ref.read(devicesProvider.notifier).deleteDevice(widget.device!.id);
+      navigator.pop(); // Close the bottom sheet
+    }
+  }
+
+  Widget _priorityChip(DevicePriority priority, String label, IconData icon) {
+    final isSelected = _priority == priority;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _priority = priority),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primaryBlue.withAlpha((0.2 * 255).toInt()) : Colors.white.withAlpha((0.05 * 255).toInt()),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isSelected ? AppColors.primaryBlue : Colors.transparent),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: isSelected ? AppColors.primaryBlue : Colors.white38, size: 20),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.white38,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildIcon(String iconName, bool active) {
+  Widget _buildIcon(String iconName, bool isSelected) {
     IconData data;
     switch (iconName) {
-      case 'lamp': data = Icons.light_outlined; break;
-      case 'ac': data = Icons.air_rounded; break;
+      case 'lamp': data = Icons.lightbulb_outline_rounded; break;
+      case 'ac': data = Icons.ac_unit_rounded; break;
       case 'tv': data = Icons.tv_rounded; break;
-      case 'fan': data = Icons.mode_fan_off_rounded; break;
+      case 'fan': data = Icons.air_rounded; break;
       case 'fridge': data = Icons.kitchen_rounded; break;
       case 'washer': data = Icons.local_laundry_service_rounded; break;
       case 'pc': data = Icons.computer_rounded; break;
       case 'router': data = Icons.router_rounded; break;
-      case 'heater': data = Icons.hot_tub_rounded; break;
+      case 'heater': data = Icons.waves_rounded; break;
+      case 'water_heater': data = Icons.hot_tub_rounded; break;
       case 'microwave': data = Icons.microwave_rounded; break;
+      case 'coffee_maker': data = Icons.coffee_maker_rounded; break;
+      case 'washing_machine': data = Icons.local_laundry_service_rounded; break;
       default: data = Icons.device_unknown_rounded;
     }
-    return Icon(data, color: active ? Colors.white : AppColors.textSecondary, size: 20);
+    return Icon(data, color: isSelected ? Colors.white : Colors.white38, size: 28);
   }
 }

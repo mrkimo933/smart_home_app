@@ -3,6 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
+
+import 'core/utils/platform/platform_io.dart' as platform_io;
+
 import 'core/localization/app_localizations.dart';
 import 'core/theme/app_theme.dart';
 import 'services/notification_service.dart';
@@ -23,6 +29,19 @@ final navigationIndexProvider = StateProvider<int>((ref) => 0);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (kIsWeb) {
+    // For web, use the web sqlite implementation.
+    databaseFactory = databaseFactoryFfiWeb;
+  } else {
+    // For desktop platforms, use sqflite_common_ffi.
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    // Touch Platform through an IO-only wrapper so the analyzer doesn't tree-shake it.
+    // (No-op at runtime.)
+    platform_io.isDesktop;
+  }
+
   // Initialize notification service
   await NotificationService().init();
 

@@ -167,6 +167,8 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
               icon: Icons.trending_up,
               isWide: true,
             ),
+            const SizedBox(height: 24),
+            _buildInsightsSection(devices),
             const SizedBox(height: 32),
             const Text(
               'توزيع استهلاك الأجهزة',
@@ -187,6 +189,68 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
               ),
             ),
             const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInsightsSection(List<dynamic> devices) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Smart Insights 💡',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+          textAlign: TextAlign.left,
+        ),
+        const SizedBox(height: 16),
+        _buildInsightCard('📈 35% more than last week', 'Your energy usage is higher than usual. Consider reducing AC time.', AppColors.errorRed),
+        _buildInsightCard('Peak usage: 7PM - 10PM daily', 'Shift heavy usage devices to off-peak hours to save money.', Colors.orangeAccent),
+        if (devices.isNotEmpty) 
+          _buildInsightCard('${devices.first.name} accounts for 60% of your bill', 'You could save ~80 EGP by reducing ${devices.first.name} by 2hrs/day.', AppColors.primaryBlue),
+        _buildInsightCard('Best Day: Tuesday', 'You used only 4.2 kWh.', AppColors.accentGreen),
+      ],
+    );
+  }
+
+  Widget _buildInsightCard(String title, String subtitle, Color stripColor) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.cardColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            Container(
+              width: 6,
+              decoration: BoxDecoration(
+                color: stripColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 4),
+                    Text(subtitle, style: TextStyle(color: Colors.white.withAlpha((0.6 * 255).toInt()), fontSize: 12)),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),

@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../models/device.dart';
 import '../../../providers/mqtt_provider.dart';
 import '../../../providers/devices_provider.dart';
+import '../../../core/utils/electricity_calculator.dart';
 import 'device_edit_dialog.dart';
 
 class DeviceCard extends ConsumerWidget {
@@ -28,6 +29,11 @@ class DeviceCard extends ConsumerWidget {
       case 'washer': return Icons.local_laundry_service_rounded;
       case 'pc': return Icons.computer_rounded;
       case 'router': return Icons.router_rounded;
+      case 'heater': return Icons.waves_rounded;
+      case 'water_heater': return Icons.hot_tub_rounded;
+      case 'microwave': return Icons.microwave_rounded;
+      case 'coffee_maker': return Icons.coffee_maker_rounded;
+      case 'washing_machine': return Icons.local_laundry_service_rounded;
       default: return Icons.device_unknown_rounded;
     }
   }
@@ -35,6 +41,7 @@ class DeviceCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bool active = device.isOn;
+    final accentColor = active ? AppColors.primaryBlue : AppColors.textSecondary;
 
     return Dismissible(
       key: Key(device.id.toString()),
@@ -43,8 +50,10 @@ class DeviceCard extends ConsumerWidget {
         return await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Delete Device?'),
-            content: const Text('Are you sure you want to delete this device?'),
+            backgroundColor: AppColors.cardColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('Delete Device?', style: TextStyle(color: Colors.white)),
+            content: const Text('Are you sure you want to delete this device?', style: TextStyle(color: Colors.white70)),
             actions: [
               TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
               TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Yes')),
@@ -59,10 +68,10 @@ class DeviceCard extends ConsumerWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
-          color: Colors.redAccent,
+          color: Colors.redAccent.withAlpha((0.2 * 255).toInt()),
           borderRadius: BorderRadius.circular(24),
         ),
-        child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+        child: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 30),
       ),
       child: GestureDetector(
         onLongPress: () => showDialog(
@@ -71,14 +80,22 @@ class DeviceCard extends ConsumerWidget {
         ),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: active ? AppColors.primaryBlue.withAlpha((0.1 * 255).toInt()) : AppColors.cardColor,
-            borderRadius: BorderRadius.circular(24),
+            color: AppColors.cardColor,
+            borderRadius: BorderRadius.circular(28),
             border: Border.all(
-              color: active ? AppColors.primaryBlue.withAlpha((0.5 * 255).toInt()) : Colors.transparent,
-              width: 2,
+              color: active ? AppColors.primaryBlue.withAlpha((0.6 * 255).toInt()) : Colors.white10,
+              width: 1.5,
             ),
+            boxShadow: active ? [
+              BoxShadow(
+                color: AppColors.primaryBlue.withAlpha((0.2 * 255).toInt()),
+                blurRadius: 15,
+                spreadRadius: 2,
+                offset: const Offset(0, 4),
+              )
+            ] : [],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,58 +103,123 @@ class DeviceCard extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(
-                    _getIcon(device.icon),
-                    color: active ? AppColors.primaryBlue : AppColors.textSecondary,
-                    size: 32,
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: active ? AppColors.primaryBlue.withAlpha((0.15 * 255).toInt()) : Colors.white.withAlpha((0.05 * 255).toInt()),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(
+                      _getIcon(device.icon),
+                      color: accentColor,
+                      size: 28,
+                    ),
                   ),
-                  Switch(
-                    value: device.isOn,
-                    onChanged: isMqttConnected 
-                      ? (val) {
-                          ref.read(mqttControllerProvider).toggleRelay(device.id, val);
-                          ref.read(devicesProvider.notifier).toggleDevice(device.id, val);
-                        }
-                      : null,
-                    activeThumbColor: AppColors.primaryBlue,
+                  Transform.scale(
+                    scale: 0.9,
+                    child: Switch(
+                      value: device.isOn,
+                      activeThumbColor: AppColors.primaryBlue,
+                      activeTrackColor: AppColors.primaryBlue.withAlpha((0.765 * 255).toInt()),
+                      inactiveThumbColor: Colors.grey,
+                      inactiveTrackColor: Colors.white10,
+                      onChanged: isMqttConnected 
+                        ? (val) {
+                            ref.read(mqttControllerProvider).toggleRelay(device.relayId, val);
+                            ref.read(devicesProvider.notifier).toggleDevice(device.relayId, val);
+                          }
+                        : null,
+                    ),
                   ),
                 ],
               ),
               const Spacer(),
-              Text(
-                device.name,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                active ? '${device.wattage.toInt()} W' : 'OFF',
-                style: TextStyle(
-                  color: active ? AppColors.accentGreen : AppColors.textSecondary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: active ? AppColors.accentGreen : Colors.grey,
+                      shape: BoxShape.circle,
+                      boxShadow: active ? [
+                        BoxShadow(
+                          color: AppColors.accentGreen.withAlpha((0.6 * 255).toInt()),
+                          blurRadius: 6,
+                          spreadRadius: 2,
+                        )
+                      ] : [],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      device.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(Icons.access_time_rounded, size: 12, color: AppColors.textSecondary),
-                  const SizedBox(width: 4),
                   Text(
-                    '${(device.totalOnMinutesToday / 60).floor()}:${(device.totalOnMinutesToday % 60).toString().padLeft(2, '0')} h',
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    '${device.wattage.toInt()}W',
+                    style: TextStyle(
+                      color: Colors.white.withAlpha((0.6 * 255).toInt()),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    '${ElectricityCalculator.calculateCost(device.wattage / 1000).toStringAsFixed(2)} EGP/hr',
+                    style: const TextStyle(
+                      color: Colors.orangeAccent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                active ? 'Running: ${_formatMinutes(device.totalOnMinutesToday)}' : 'Total today: ${_formatMinutes(device.totalOnMinutesToday)}',
+                style: TextStyle(
+                  color: Colors.white.withAlpha((0.4 * 255).toInt()),
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: (device.totalOnMinutesToday / (8 * 60)).clamp(0.0, 1.0),
+                  backgroundColor: Colors.white.withAlpha((0.05 * 255).toInt()),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    active ? AppColors.primaryBlue : Colors.white30,
+                  ),
+                  minHeight: 4,
+                ),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  String _formatMinutes(int minutes) {
+    if (minutes < 60) return '${minutes}m';
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    return '${h}h ${m}m';
   }
 }

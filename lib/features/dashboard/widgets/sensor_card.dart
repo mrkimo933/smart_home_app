@@ -21,6 +21,8 @@ class SensorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final numericValue = double.tryParse(value) ?? 0.0;
+
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(12),
@@ -46,24 +48,26 @@ class SensorCard extends StatelessWidget {
               textBaseline: TextBaseline.alphabetic,
               children: [
                 TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: 0, end: double.tryParse(value) ?? 0),
-                  duration: const Duration(milliseconds: 500),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOutCubic,
+                  tween: Tween<double>(begin: 0, end: numericValue),
                   builder: (context, val, child) {
+                    int decimals = value.contains('.') ? value.split('.')[1].length : 0;
                     return Text(
-                      val.toStringAsFixed(1),
+                      val.toStringAsFixed(decimals),
                       style: const TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     );
                   },
                 ),
                 Text(
-                  ' $unit',
+                  unit,
                   style: const TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 10,
+                    fontSize: 12,
                   ),
                 ),
               ],
