@@ -45,10 +45,10 @@ class DeviceCard extends ConsumerWidget {
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: active ? AppColors.primaryBlue.withOpacity(0.1) : AppColors.cardColor,
+          color: active ? AppColors.primaryBlue.withAlpha((0.1 * 255).toInt()) : AppColors.cardColor,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: active ? AppColors.primaryBlue.withOpacity(0.5) : Colors.transparent,
+            color: active ? AppColors.primaryBlue.withAlpha((0.5 * 255).toInt()) : Colors.transparent,
             width: 2,
           ),
         ),
@@ -68,10 +68,10 @@ class DeviceCard extends ConsumerWidget {
                   onChanged: isMqttConnected 
                     ? (val) {
                         ref.read(mqttControllerProvider).toggleRelay(device.id, val);
-                        ref.read(devicesProvider.notifier).toggleDeviceState(device.id, val);
+                        ref.read(devicesProvider.notifier).toggleDevice(device.id, val);
                       }
                     : null,
-                  activeColor: AppColors.primaryBlue,
+                  activeThumbColor: AppColors.primaryBlue,
                 ),
               ],
             ),

@@ -28,7 +28,7 @@ class BillPredictionCard extends StatelessWidget {
         color: AppColors.cardColor,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isOverBudget ? AppColors.errorRed.withOpacity(0.3) : Colors.transparent,
+          color: isOverBudget ? AppColors.errorRed.withAlpha((0.3 * 255).toInt()) : Colors.transparent,
         ),
       ),
       child: Column(

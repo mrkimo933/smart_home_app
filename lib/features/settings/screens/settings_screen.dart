@@ -94,7 +94,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final language = ref.watch(languageProvider);
     final isConnected = ref.watch(connectionStatusProvider).value ?? false;
-    final devices = ref.watch(devicesProvider).value ?? [];
+    final devices = ref.watch(devicesProvider);
 
     return Scaffold(
       appBar: AppBar(

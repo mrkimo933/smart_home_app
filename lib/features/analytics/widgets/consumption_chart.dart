@@ -33,7 +33,7 @@ class ConsumptionChart extends StatelessWidget {
             drawVerticalLine: false,
             horizontalInterval: 1,
             getDrawingHorizontalLine: (value) {
-              return FlLine(
+              return const FlLine(
                 color: AppColors.cardColor,
                 strokeWidth: 1,
               );
@@ -107,8 +107,8 @@ class ConsumptionChart extends StatelessWidget {
                 show: true,
                 gradient: LinearGradient(
                   colors: [
-                    AppColors.primaryBlue.withOpacity(0.3),
-                    AppColors.primaryBlue.withOpacity(0),
+                    AppColors.primaryBlue.withAlpha((0.3 * 255).toInt()),
+                    AppColors.primaryBlue.withAlpha(0),
                   ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -118,7 +118,7 @@ class ConsumptionChart extends StatelessWidget {
           ],
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
-              getTooltipColor: (_) => AppColors.cardColor,
+              tooltipBgColor: AppColors.cardColor,
               getTooltipItems: (touchedSpots) {
                 return touchedSpots.map((spot) {
                   return LineTooltipItem(

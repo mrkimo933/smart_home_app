@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/consumption_record.dart';
 import '../services/database_service.dart';
 import 'devices_provider.dart';
+import '../services/notification_service.dart';
 
 // Monthly Kwh Provider
 final monthlyKwhProvider = FutureProvider<double>((ref) async {
@@ -14,6 +15,24 @@ final monthlyKwhProvider = FutureProvider<double>((ref) async {
 final monthlyCostProvider = FutureProvider<double>((ref) async {
   final dbService = ref.watch(databaseServiceProvider);
   return await dbService.getTotalCostThisMonth();
+});
+
+// Notify when monthly cost exceeds budget
+final budgetAlertProvider = Provider<void>((ref) {
+  ref.listen<AsyncValue<double>>(monthlyCostProvider, (prev, next) {
+    next.whenData((cost) {
+      final budget = ref.read(budgetProvider);
+      if (cost >= budget && budget > 0) {
+        NotificationService().showNotification(
+          id: 100,
+          title: 'Budget Alert',
+          body: 'You have exceeded your monthly budget of EGP ${budget.toStringAsFixed(2)}',
+        );
+      }
+    });
+  });
+
+  return;
 });
 
 // Consumption History Notifier

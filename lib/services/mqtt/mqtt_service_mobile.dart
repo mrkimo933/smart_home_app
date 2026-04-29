@@ -1,28 +1,32 @@
-// lib/services/mqtt_service.dart
+// lib/services/mqtt/mqtt_service_mobile.dart
 
 import 'dart:async';
-import 'dart:convert';
+
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../core/constants/mqtt_topics.dart';
-import '../models/sensor_data.dart';
+import 'package:smart_home_app/services/database_service.dart';
+import 'package:smart_home_app/services/mqtt/mqtt_service_interface.dart';
+import '../../core/constants/mqtt_topics.dart';
+import '../../models/sensor_data.dart';
 
-class MqttService {
+MqttServiceInterface getMqttService() => MqttServiceMobile();
+
+class MqttServiceMobile implements MqttServiceInterface {
   MqttServerClient? _client;
   final String _clientId = 'flutter_energy_monitor_${DateTime.now().millisecondsSinceEpoch}';
   
-  // Stream Controllers
   final _sensorDataController = StreamController<SensorData>.broadcast();
   final _relayStatesController = StreamController<Map<int, bool>>.broadcast();
   final _connectionStatusController = StreamController<bool>.broadcast();
 
-  // Streams
+  @override
   Stream<SensorData> get sensorDataStream => _sensorDataController.stream;
+  @override
   Stream<Map<int, bool>> get relayStatesStream => _relayStatesController.stream;
+  @override
   Stream<bool> get connectionStatusStream => _connectionStatusController.stream;
 
-  // Internal state
   double _voltage = 0.0;
   double _current = 0.0;
   double _power = 0.0;
@@ -31,8 +35,10 @@ class MqttService {
   
   Timer? _reconnectTimer;
   bool _isManuallyDisconnected = false;
+  SensorData? _latestSensorData;
+  Timer? _sensorPersistTimer;
 
-  MqttService() {
+  MqttServiceMobile() {
     _init();
   }
 
@@ -40,10 +46,11 @@ class MqttService {
     await connect();
   }
 
+  @override
   Future<void> connect() async {
     _isManuallyDisconnected = false;
     final prefs = await SharedPreferences.getInstance();
-    final brokerIp = prefs.getString('mqtt_broker_ip') ?? '192.168.1.100'; // Default if not found
+    final brokerIp = prefs.getString('mqtt_broker_ip') ?? '192.168.1.100';
     
     _client = MqttServerClient(brokerIp, _clientId);
     _client!.port = 1883;
@@ -63,10 +70,8 @@ class MqttService {
     _client!.connectionMessage = connMess;
 
     try {
-      print('MQTT: Connecting to $brokerIp...');
       await _client!.connect();
     } catch (e) {
-      print('MQTT: Connection failed: $e');
       _connectionStatusController.add(false);
       _scheduleReconnect();
     }
@@ -104,7 +109,6 @@ class MqttService {
       _kwh = val ?? 0.0;
       sensorUpdated = true;
     } else if (topic.startsWith('esp/relay/')) {
-      // esp/relay/X/state
       final parts = topic.split('/');
       if (parts.length >= 3) {
         final id = int.tryParse(parts[2]);
@@ -116,32 +120,42 @@ class MqttService {
     }
 
     if (sensorUpdated) {
-      _sensorDataController.add(SensorData(
+      final data = SensorData(
         voltage: _voltage,
         current: _current,
         power: _power,
         kwh: _kwh,
         timestamp: DateTime.now(),
-      ));
+      );
+      _sensorDataController.add(data);
+
+      _latestSensorData = data;
+      _sensorPersistTimer ??= Timer.periodic(const Duration(minutes: 5), (_) async {
+        if (_latestSensorData != null) {
+          try {
+            await DatabaseService().insertSensorData(_latestSensorData!);
+          } catch (e) {
+            // Log error or handle silently in production
+          }
+          _latestSensorData = null;
+        }
+      });
     }
   }
 
   void _subscribeToTopics() {
     if (_client?.connectionStatus?.state == MqttConnectionState.connected) {
-      // Subscribe to sensors
       for (var topic in MqttTopics.sensorTopics) {
         _client!.subscribe(topic, MqttQos.atMostOnce);
       }
       
-      // Subscribe to relays
       for (var topic in MqttTopics.relayStateTopics) {
         _client!.subscribe(topic, MqttQos.atMostOnce);
       }
-      
-      print('MQTT: Subscribed to all topics');
     }
   }
 
+  @override
   void publishRelayCommand(int relayId, bool state) {
     if (_client?.connectionStatus?.state == MqttConnectionState.connected) {
       final topic = MqttTopics.relaySet(relayId);
@@ -151,21 +165,16 @@ class MqttService {
       builder.addString(payload);
       
       _client!.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
-      print('MQTT: Published $payload to $topic');
-    } else {
-      print('MQTT: Cannot publish, not connected');
     }
   }
 
   void _onConnected() {
-    print('MQTT: Connected');
     _connectionStatusController.add(true);
     _reconnectTimer?.cancel();
     _subscribeToTopics();
   }
 
   void _onDisconnected() {
-    print('MQTT: Disconnected');
     _connectionStatusController.add(false);
     if (!_isManuallyDisconnected) {
       _scheduleReconnect();
@@ -175,25 +184,17 @@ class MqttService {
   void _scheduleReconnect() {
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(const Duration(seconds: 5), () {
-      print('MQTT: Attempting auto-reconnect...');
       connect();
     });
   }
 
   void _onSubscribed(String topic) {
-    print('MQTT: Success subscribing to $topic');
   }
 
+  @override
   void disconnect() {
     _isManuallyDisconnected = true;
     _reconnectTimer?.cancel();
     _client?.disconnect();
-  }
-
-  void dispose() {
-    disconnect();
-    _sensorDataController.close();
-    _relayStatesController.close();
-    _connectionStatusController.close();
   }
 }

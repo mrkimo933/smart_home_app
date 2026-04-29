@@ -138,7 +138,7 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
         margin: const EdgeInsets.only(top: 8, right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryBlue.withOpacity(0.2) : Colors.transparent,
+          color: isSelected ? AppColors.primaryBlue.withAlpha((0.2 * 255).toInt()) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: isSelected ? AppColors.primaryBlue : Colors.white10),
         ),

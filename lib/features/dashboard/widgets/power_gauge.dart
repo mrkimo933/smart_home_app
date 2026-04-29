@@ -72,7 +72,7 @@ class PowerGauge extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                       shadows: [
                         Shadow(
-                          color: color.withOpacity(0.5),
+                          color: color.withAlpha((0.5 * 255).toInt()),
                           blurRadius: 20,
                         ),
                       ],

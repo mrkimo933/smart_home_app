@@ -122,7 +122,7 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
                 textAlign: TextAlign.right,
               ),
-              activeColor: AppColors.primaryBlue,
+              activeThumbColor: AppColors.primaryBlue,
             ),
             const SizedBox(height: 24),
             const Text(
@@ -147,7 +147,7 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
       decoration: BoxDecoration(
         color: AppColors.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
+        border: Border.all(color: AppColors.primaryBlue.withAlpha((0.3 * 255).toInt())),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

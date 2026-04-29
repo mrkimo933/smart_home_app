@@ -111,7 +111,7 @@ class DevicePriorityCard extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withAlpha((0.2 * 255).toInt()),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: color, width: 0.5),
       ),
@@ -126,23 +126,23 @@ class DevicePriorityCard extends ConsumerWidget {
     return PopupMenuButton<DevicePriority>(
       initialValue: device.priority,
       onSelected: (priority) {
-        ref.read(devicesProvider.notifier).updateDeviceDetails(
+        ref.read(devicesProvider.notifier).updateDevice(
           device.copyWith(priority: priority),
         );
       },
-      child: Row(
+      child: const Row(
         children: [
-          const Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
-          const Text(
+          Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
+          Text(
             'تغيير الأولوية',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
         ],
       ),
-      itemBuilder: (context) => [
-        const PopupMenuItem(value: DevicePriority.essential, child: Text('أساسي')),
-        const PopupMenuItem(value: DevicePriority.normal, child: Text('عادي')),
-        const PopupMenuItem(value: DevicePriority.nonEssential, child: Text('ثانوي')),
+      itemBuilder: (context) => const [
+        PopupMenuItem(value: DevicePriority.essential, child: Text('أساسي')),
+        PopupMenuItem(value: DevicePriority.normal, child: Text('عادي')),
+        PopupMenuItem(value: DevicePriority.nonEssential, child: Text('ثانوي')),
       ],
     );
   }

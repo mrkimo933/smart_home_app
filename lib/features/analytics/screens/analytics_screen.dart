@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/export_service.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../providers/consumption_provider.dart';
 import '../../../providers/devices_provider.dart';
@@ -66,6 +67,25 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
         title: const Text('الإحصائيات', style: TextStyle(color: AppColors.textPrimary)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: () {
+              historyAsync.whenData((records) {
+                ExportService().exportToPdf(records);
+              });
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.file_download_outlined),
+            onPressed: () {
+              historyAsync.whenData((records) {
+                ExportService().exportToCsv(records);
+              });
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: AppColors.primaryBlue,

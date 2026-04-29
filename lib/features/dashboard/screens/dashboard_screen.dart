@@ -33,7 +33,7 @@ class DashboardScreen extends ConsumerWidget {
       body: sensorDataAsync.when(
         data: (data) => _buildContent(context, data),
         loading: () => _buildLoadingState(context),
-        error: (err, stack) => _buildErrorState(context, err.toString()),
+        error: (err, stack) => _buildErrorState(context, err.toString(), ref),
       ),
     );
   }
@@ -90,19 +90,24 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildErrorState(BuildContext context, String error) {
+  Widget _buildErrorState(BuildContext context, String error, WidgetRef ref) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline_rounded, color: AppColors.errorRed, size: 64),
+          const Icon(Icons.cloud_off_rounded, color: AppColors.errorRed, size: 64),
           const SizedBox(height: 16),
           const Text(
-            'Connection Error',
+            'System Offline',
             style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          Text(error, style: const TextStyle(color: AppColors.textSecondary)),
+          Text('Last updated few moments ago', style: const TextStyle(color: AppColors.textSecondary)),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: () => ref.read(mqttServiceProvider).connect(),
+            child: const Text('Retry Connection'),
+          ),
         ],
       ),
     );
@@ -124,8 +129,8 @@ class _ConnectionBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: isConnecting 
-            ? Colors.orange.withOpacity(0.1)
-            : (isConnected ? AppColors.connectedGreen.withOpacity(0.1) : AppColors.disconnectedRed.withOpacity(0.1)),
+            ? Colors.orange.withAlpha((0.1 * 255).toInt())
+            : (isConnected ? AppColors.connectedGreen.withAlpha((0.1 * 255).toInt()) : AppColors.disconnectedRed.withAlpha((0.1 * 255).toInt())),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isConnecting

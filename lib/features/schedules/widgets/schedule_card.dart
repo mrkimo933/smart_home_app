@@ -53,7 +53,7 @@ class ScheduleCard extends StatelessWidget {
                 Switch(
                   value: schedule.isEnabled,
                   onChanged: onToggle,
-                  activeColor: AppColors.primaryBlue,
+                  activeThumbColor: AppColors.primaryBlue,
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: AppColors.errorRed),
@@ -70,7 +70,7 @@ class ScheduleCard extends StatelessWidget {
                 return Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primaryBlue.withOpacity(0.2) : Colors.transparent,
+                    color: isSelected ? AppColors.primaryBlue.withAlpha((0.2 * 255).toInt()) : Colors.transparent,
                     shape: BoxShape.circle,
                     border: isSelected ? Border.all(color: AppColors.primaryBlue, width: 1) : null,
                   ),

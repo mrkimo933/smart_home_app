@@ -132,6 +132,7 @@ class _SchedulesScreenState extends ConsumerState<SchedulesScreen> {
         devices: devices,
         onSave: (schedule) async {
           await DatabaseService().insertSchedule(schedule);
+          if (!context.mounted) return;
           ref.invalidate(schedulesProvider);
           Navigator.pop(context);
         },
@@ -148,7 +149,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.schedule, size: 80, color: AppColors.textSecondary.withOpacity(0.5)),
+          Icon(Icons.schedule, size: 80, color: AppColors.textSecondary.withAlpha((0.5 * 255).toInt())),
           const SizedBox(height: 16),
           const Text(
             'لا توجد جداول زمنية مضافة',
@@ -197,7 +198,7 @@ class _AddScheduleSheetState extends State<_AddScheduleSheet> {
           ),
           const SizedBox(height: 24),
           DropdownButtonFormField<Device>(
-            value: _selectedDevice,
+            initialValue: _selectedDevice,
             dropdownColor: AppColors.cardColor,
             style: const TextStyle(color: AppColors.textPrimary),
             decoration: const InputDecoration(labelText: 'اختر الجهاز', labelStyle: TextStyle(color: AppColors.textSecondary)),

@@ -21,64 +21,56 @@ class DevicesScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(AppStrings.getString(language, 'devices')),
       ),
-      body: devicesAsync.when(
-        data: (devices) {
-          final activeDevices = devices.where((d) => d.isOn).length;
-          final totalWattage = devices.where((d) => d.isOn).fold(0.0, (sum, d) => sum + d.wattage);
-          final isConnected = isConnectedAsync.value ?? false;
-
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Container(
+      body: devicesAsync.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                Padding(
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColors.primaryBlue, AppColors.primaryBlue.withOpacity(0.7)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryBlue.withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppColors.primaryBlue, AppColors.primaryBlue.withAlpha((0.7 * 255).toInt())],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      _buildSummaryItem('$activeDevices / ${devices.length}', 'Active Devices'),
-                      Container(height: 40, width: 1, color: Colors.white24),
-                      _buildSummaryItem('${totalWattage.toInt()} W', 'Total Load'),
-                    ],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: GridView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 0.85,
-                  ),
-                  itemCount: devices.length,
-                  itemBuilder: (context, index) => DeviceCard(
-                    device: devices[index],
-                    isMqttConnected: isConnected,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primaryBlue.withAlpha((0.3 * 255).toInt()),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        _buildSummaryItem('${devicesAsync.where((d) => d.isOn).length} / ${devicesAsync.length}', 'Active Devices'),
+                        Container(height: 40, width: 1, color: Colors.white24),
+                        _buildSummaryItem('${devicesAsync.where((d) => d.isOn).fold(0.0, (sum, d) => sum + d.wattage).toInt()} W', 'Total Load'),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err', style: const TextStyle(color: Colors.white))),
-      ),
+                Expanded(
+                  child: GridView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 0.85,
+                    ),
+                    itemCount: devicesAsync.length,
+                    itemBuilder: (context, index) => DeviceCard(
+                      device: devicesAsync[index],
+                      isMqttConnected: isConnectedAsync.value ?? false,
+                    ),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 
