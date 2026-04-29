@@ -10,7 +10,18 @@ class DevicesNotifier extends StateNotifier<List<Device>> {
   final DatabaseService _dbService;
 
   DevicesNotifier(this._dbService) : super([]) {
+    // Initial state with some defaults while we wait for DB
+    state = _getDefaultDevices();
     loadDevices();
+  }
+
+  List<Device> _getDefaultDevices() {
+    return [
+      Device(id: 1, name: 'Air Conditioner', icon: 'ac_unit', relayId: 1, wattage: 2000.0, isOn: false, priority: DevicePriority.normal, totalOnMinutesToday: 0),
+      Device(id: 2, name: 'Water Heater', icon: 'hot_tub', relayId: 2, wattage: 3000.0, isOn: false, priority: DevicePriority.normal, totalOnMinutesToday: 0),
+      Device(id: 3, name: 'Lighting', icon: 'lightbulb', relayId: 3, wattage: 100.0, isOn: false, priority: DevicePriority.essential, totalOnMinutesToday: 0),
+      Device(id: 4, name: 'Washing Machine', icon: 'local_laundry_service', relayId: 4, wattage: 1500.0, isOn: false, priority: DevicePriority.nonEssential, totalOnMinutesToday: 0),
+    ];
   }
 
   Future<void> loadDevices() async {

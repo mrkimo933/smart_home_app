@@ -92,6 +92,7 @@ class ElectricityCalculator {
 
   /// 7. Calculate daily cost for a single device
   static double getDeviceDailyCost(double wattage, double hoursPerDay) {
+    if (wattage <= 0 || hoursPerDay <= 0) return 0.0;
     double dailyKwh = (wattage * hoursPerDay) / 1000;
     // Note: Cost is calculated based on current tier usually, 
     // but here we calculate it as if it's the only usage (baseline)

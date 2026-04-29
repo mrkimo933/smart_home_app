@@ -166,8 +166,8 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
           const SizedBox(height: 20),
           ...devices.map((device) {
             // Assume 4 devices share the budget goal
-            final deviceShare = recommendedDailyKwh / 4;
-            final hours = (deviceShare * 1000) / device.wattage;
+            final deviceShare = recommendedDailyKwh / (devices.isEmpty ? 1 : devices.length);
+            final hours = (device.wattage > 0) ? (deviceShare * 1000) / device.wattage : 0.0;
             
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),

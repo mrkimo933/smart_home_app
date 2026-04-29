@@ -29,7 +29,36 @@ final connectionStatusProvider = StreamProvider<bool>((ref) {
 /// Provider for incoming sensor data
 final sensorDataProvider = StreamProvider<SensorData>((ref) {
   final mqttService = ref.watch(mqttServiceProvider);
-  return mqttService.sensorDataStream;
+  
+  // Create a controller to mix in a timeout fallback
+  final controller = StreamController<SensorData>();
+  
+  // Listen to the actual MQTT stream
+  final subscription = mqttService.sensorDataStream.listen(
+    (data) => controller.add(data),
+    onError: (err) => controller.addError(err),
+    onDone: () => controller.close(),
+  );
+
+  // Setup timeout: if no data within 3 seconds, provide dummy initial data
+  Timer? timeoutTimer = Timer(const Duration(seconds: 3), () {
+    if (!controller.hasListener) return;
+    controller.add(SensorData(
+      power: 0.0,
+      voltage: 220.0,
+      current: 0.0,
+      kwh: 0.0,
+      timestamp: DateTime.now(),
+    ));
+  });
+
+  ref.onDispose(() {
+    subscription.cancel();
+    timeoutTimer.cancel();
+    controller.close();
+  });
+
+  return controller.stream;
 });
 
 /// Provider for relay states map

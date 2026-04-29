@@ -1,10 +1,8 @@
 // lib/core/localization/app_localizations.dart
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'en.dart';
 import 'ar.dart';
-import '../constants/app_strings.dart';
 
 class AppLocalizations {
   final Locale locale;
