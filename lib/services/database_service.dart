@@ -160,6 +160,15 @@ class DatabaseService {
     );
   }
 
+  Future<void> deleteDevice(int id) async {
+    final db = await database;
+    await db.delete(
+      'devices',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   // Sensor History
   Future<void> insertSensorData(SensorData data) async {
     final db = await database;

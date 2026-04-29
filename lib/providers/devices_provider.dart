@@ -35,6 +35,19 @@ class DevicesNotifier extends StateNotifier<List<Device>> {
     }
   }
 
+  Future<void> addDevice(Device device) async {
+    // Basic ID generation: find max id and add 1
+    final newId = state.isEmpty ? 1 : state.map((d) => d.id).reduce((a, b) => a > b ? a : b) + 1;
+    final deviceWithId = device.copyWith(id: newId);
+    await _dbService.insertDevice(deviceWithId);
+    state = [...state, deviceWithId];
+  }
+
+  Future<void> deleteDevice(int id) async {
+    await _dbService.deleteDevice(id);
+    state = state.where((d) => d.id != id).toList();
+  }
+
   Future<void> updateDevice(Device device) async {
     await _dbService.updateDevice(device);
     state = [

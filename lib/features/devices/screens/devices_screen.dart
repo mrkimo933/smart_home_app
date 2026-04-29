@@ -7,6 +7,7 @@ import '../../../core/constants/app_strings.dart';
 import '../../../providers/devices_provider.dart';
 import '../../../providers/mqtt_provider.dart';
 import '../widgets/device_card.dart';
+import '../widgets/device_edit_dialog.dart';
 
 class DevicesScreen extends ConsumerWidget {
   const DevicesScreen({super.key});
@@ -20,6 +21,24 @@ class DevicesScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(AppStrings.getString(language, 'devices')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_rounded),
+            onPressed: () => showDialog(
+              context: context,
+              builder: (context) => const DeviceEditDialog()
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => showDialog(
+          context: context,
+          builder: (context) => const DeviceEditDialog()
+        ),
+        backgroundColor: AppColors.primaryBlue,
+        child: const Icon(Icons.add_rounded, color: Colors.white),
       ),
       body: devicesAsync.isEmpty
           ? const Center(child: CircularProgressIndicator())

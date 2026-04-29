@@ -7,9 +7,9 @@ import '../../../models/device.dart';
 import '../../../providers/devices_provider.dart';
 
 class DeviceEditDialog extends ConsumerStatefulWidget {
-  final Device device;
+  final Device? device;
 
-  const DeviceEditDialog({super.key, required this.device});
+  const DeviceEditDialog({super.key, this.device});
 
   @override
   ConsumerState<DeviceEditDialog> createState() => _DeviceEditDialogState();
@@ -20,16 +20,18 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
   late TextEditingController _wattageController;
   late String _selectedIcon;
   late DevicePriority _priority;
+  late int _selectedRelay;
 
-  final List<String> _icons = ['lamp', 'ac', 'tv', 'fan', 'fridge', 'washer', 'pc', 'router'];
+  final List<String> _icons = ['lamp', 'ac', 'tv', 'fan', 'fridge', 'washer', 'pc', 'router', 'heater', 'microwave'];
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.device.name);
-    _wattageController = TextEditingController(text: widget.device.wattage.toString());
-    _selectedIcon = widget.device.icon;
-    _priority = widget.device.priority;
+    _nameController = TextEditingController(text: widget.device?.name ?? '');
+    _wattageController = TextEditingController(text: widget.device?.wattage.toString() ?? '');
+    _selectedIcon = widget.device?.icon ?? 'lamp';
+    _priority = widget.device?.priority ?? DevicePriority.normal;
+    _selectedRelay = widget.device?.relayId ?? 1;
   }
 
   @override
@@ -44,7 +46,7 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
     return AlertDialog(
       backgroundColor: AppColors.cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: const Text('Edit Device', style: TextStyle(color: AppColors.textPrimary)),
+      title: Text(widget.device == null ? 'Add Device' : 'Edit Device', style: const TextStyle(color: AppColors.textPrimary)),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -105,6 +107,29 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
                 _priorityChip(DevicePriority.nonEssential, 'Low'),
               ],
             ),
+            const SizedBox(height: 24),
+            const Text('Relay ID', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [1, 2, 3, 4].map((id) {
+                final isSelected = _selectedRelay == id;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedRelay = id),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primaryBlue : Colors.white10,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      id.toString(),
+                      style: TextStyle(color: isSelected ? Colors.white : AppColors.textSecondary),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           ],
         ),
       ),
@@ -113,18 +138,54 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
         ),
+        if (widget.device != null)
+           TextButton(
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Delete Device?'),
+                  content: const Text('Are you sure you want to delete this device?'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
+                    TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Yes')),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                ref.read(devicesProvider.notifier).deleteDevice(widget.device!.id);
+                if (mounted) Navigator.pop(context);
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+          ),
         ElevatedButton(
           onPressed: () {
-            final updated = widget.device.copyWith(
-              name: _nameController.text,
-              wattage: double.tryParse(_wattageController.text) ?? 100.0,
-              icon: _selectedIcon,
-              priority: _priority,
-            );
-            ref.read(devicesProvider.notifier).updateDevice(updated);
+            if (widget.device == null) {
+              final newDevice = Device(
+                id: 0, // Assigned by notifier
+                name: _nameController.text,
+                wattage: double.tryParse(_wattageController.text) ?? 0,
+                icon: _selectedIcon,
+                isOn: false,
+                priority: _priority,
+                totalOnMinutesToday: 0,
+                relayId: _selectedRelay,
+              );
+              ref.read(devicesProvider.notifier).addDevice(newDevice);
+            } else {
+              final updated = widget.device!.copyWith(
+                name: _nameController.text,
+                wattage: double.tryParse(_wattageController.text) ?? 100.0,
+                icon: _selectedIcon,
+                priority: _priority,
+                relayId: _selectedRelay,
+              );
+              ref.read(devicesProvider.notifier).updateDevice(updated);
+            }
             Navigator.pop(context);
           },
-          child: const Text('Save'),
+          child: Text(widget.device == null ? 'Add' : 'Save'),
         ),
       ],
     );
@@ -164,6 +225,8 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
       case 'washer': data = Icons.local_laundry_service_rounded; break;
       case 'pc': data = Icons.computer_rounded; break;
       case 'router': data = Icons.router_rounded; break;
+      case 'heater': data = Icons.hot_tub_rounded; break;
+      case 'microwave': data = Icons.microwave_rounded; break;
       default: data = Icons.device_unknown_rounded;
     }
     return Icon(data, color: active ? Colors.white : AppColors.textSecondary, size: 20);
