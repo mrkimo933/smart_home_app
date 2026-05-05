@@ -9,10 +9,12 @@ import '../../../core/constants/app_strings.dart';
 import '../../../providers/mqtt_provider.dart';
 import '../../../providers/devices_provider.dart';
 import '../../../models/device.dart';
-// import '../../../core/utils/electricity_calculator.dart';
+import '../../../services/simulation_service.dart';
 import '../widgets/power_gauge.dart';
 import '../widgets/sensor_card.dart';
 import '../widgets/bill_prediction_card.dart';
+import '../widgets/peak_hours_banner.dart';
+import '../widgets/quick_actions_bar.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -25,15 +27,34 @@ class DashboardScreen extends ConsumerWidget {
     final voltageStatus = ref.watch(voltageStatusProvider);
     final voltage = sensorDataAsync.value?.voltage ?? 0.0;
 
+    final isSimulating = ref.watch(isSimulatingProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(AppStrings.getString(language, 'dashboard')),
         actions: [
+          if (isSimulating)
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange.withAlpha(40),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.orange, width: 1),
+              ),
+              child: const Text('SIM',
+                  style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11)),
+            ),
           // Feature 5: voltage status indicator
           _VoltageIndicator(status: voltageStatus, voltage: voltage),
           const SizedBox(width: 8),
           isConnectedAsync.when(
-            data: (isConnected) => _ConnectionBadge(isConnected: isConnected),
+            data: (isConnected) =>
+                _ConnectionBadge(isConnected: isConnected),
             loading: () =>
                 const _ConnectionBadge(isConnected: false, isConnecting: true),
             error: (_, __) => const _ConnectionBadge(isConnected: false),
@@ -43,7 +64,10 @@ class DashboardScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          if (isConnectedAsync.hasValue && isConnectedAsync.value == false)
+          // Peak hours warning banner
+          const PeakHoursBanner(),
+          if (isConnectedAsync.hasValue &&
+              isConnectedAsync.value == false)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -59,8 +83,8 @@ class DashboardScreen extends ConsumerWidget {
           if (voltageStatus == VoltageStatus.high)
             Container(
               width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+              padding: const EdgeInsets.symmetric(
+                  vertical: 10, horizontal: 16),
               color: Colors.red.shade900,
               child: Row(
                 children: [
@@ -82,8 +106,8 @@ class DashboardScreen extends ConsumerWidget {
           else if (voltageStatus == VoltageStatus.low)
             Container(
               width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+              padding: const EdgeInsets.symmetric(
+                  vertical: 10, horizontal: 16),
               color: Colors.orange.shade900,
               child: Row(
                 children: [
@@ -101,6 +125,13 @@ class DashboardScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+            ),
+          // Simulation orange border indicator
+          if (isSimulating)
+            Container(
+              width: double.infinity,
+              height: 3,
+              color: Colors.orange,
             ),
           Expanded(
             child: sensorDataAsync.when(
@@ -184,7 +215,7 @@ class DashboardScreen extends ConsumerWidget {
               const SizedBox(height: 24),
               BillPredictionCard(currentKwh: data.kwh),
               const SizedBox(height: 24),
-              _buildQuickActions(context, ref, isConnected),
+              const QuickActionsBar(),
               const SizedBox(height: 24),
               _buildQuickDeviceToggles(devices, ref, isConnected),
               const SizedBox(height: 30),
@@ -314,126 +345,8 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildQuickActions(BuildContext context, WidgetRef ref, bool isConnected) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Quick Actions",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildQuickActionBtn(
-              'Turn Off All', 
-              Icons.power_settings_new, 
-              Colors.redAccent, 
-              () => _confirmAction(context, "Turn off all devices?", () {
-                final devices = ref.read(devicesProvider);
-                for (var d in devices) {
-                  if (d.isOn) {
-                    ref.read(mqttControllerProvider).toggleRelay(d.relayId, false);
-                    ref.read(devicesProvider.notifier).toggleDevice(d.relayId, false);
-                  }
-                }
-              }),
-              isConnected,
-            ),
-             _buildQuickActionBtn(
-              'Essential Only', 
-              Icons.priority_high, 
-              AppColors.primaryBlue, 
-              () => _confirmAction(context, "Turn off non-essential devices?", () {
-                final devices = ref.read(devicesProvider);
-                for (var d in devices) {
-                  if (d.isOn && d.priority != DevicePriority.essential) {
-                    ref.read(mqttControllerProvider).toggleRelay(d.relayId, false);
-                    ref.read(devicesProvider.notifier).toggleDevice(d.relayId, false);
-                  }
-                }
-              }),
-              isConnected,
-            ),
-             _buildQuickActionBtn(
-              'Night Mode', 
-              Icons.nightlight_round, 
-              Colors.indigoAccent, 
-              () => _confirmAction(context, "Activate night mode? (Turns off non-essential + normal)", () {
-                final devices = ref.read(devicesProvider);
-                for (var d in devices) {
-                  if (d.isOn && d.priority != DevicePriority.essential) {
-                    ref.read(mqttControllerProvider).toggleRelay(d.relayId, false);
-                    ref.read(devicesProvider.notifier).toggleDevice(d.relayId, false);
-                  }
-                }
-              }),
-              isConnected,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
 
-  Widget _buildQuickActionBtn(String title, IconData icon, Color color, VoidCallback onTap, bool isEnabled) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: isEnabled ? onTap : null,
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          decoration: BoxDecoration(
-            color: isEnabled ? color.withAlpha((0.2 * 255).toInt()) : Colors.grey.withAlpha((0.1 * 255).toInt()),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isEnabled ? color : Colors.transparent),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: isEnabled ? color : Colors.grey, size: 24),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isEnabled ? Colors.white : Colors.grey,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              )
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
-  void _confirmAction(BuildContext context, String message, VoidCallback onConfirm) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Confirm Action', style: TextStyle(color: Colors.white)),
-        content: Text(message, style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              onConfirm();
-              Navigator.pop(context);
-            }, 
-            child: const Text('Yes', style: TextStyle(color: AppColors.primaryBlue)),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildQuickDeviceToggles(List<dynamic> devices, WidgetRef ref, bool isConnected) {
     if (devices.isEmpty) return const SizedBox.shrink();

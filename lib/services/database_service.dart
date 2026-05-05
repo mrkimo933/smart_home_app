@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/sensor_data.dart';
@@ -16,6 +17,7 @@ class DatabaseService {
   DatabaseService._internal();
 
   Future<Database> get database async {
+    if (kIsWeb) throw UnsupportedError('DB not available on web');
     if (_database != null) return _database!;
     _database = await _initDatabase();
     return _database!;
@@ -191,6 +193,7 @@ class DatabaseService {
 
   // Public init for checking if empty
   Future<void> initDefaultDevices() async {
+    if (kIsWeb) return;
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query('devices');
     if (maps.isEmpty) {
@@ -200,12 +203,14 @@ class DatabaseService {
 
   // Devices
   Future<List<Device>> getDevices() async {
+    if (kIsWeb) return Device.defaultDevices;
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query('devices');
     return maps.map(_deviceFromMap).toList();
   }
 
   Future<void> insertDevice(Device device) async {
+    if (kIsWeb) return;
     final db = await database;
     await db.insert(
       'devices',
@@ -215,6 +220,7 @@ class DatabaseService {
   }
 
   Future<void> updateDevice(Device device) async {
+    if (kIsWeb) return;
     final db = await database;
     final map = _deviceToMap(device)..remove('id');
     await db.update(
@@ -226,12 +232,14 @@ class DatabaseService {
   }
 
   Future<void> deleteDevice(int id) async {
+    if (kIsWeb) return;
     final db = await database;
     await db.delete('devices', where: 'id = ?', whereArgs: [id]);
   }
 
   // Sensor History
   Future<void> insertSensorData(SensorData data) async {
+    if (kIsWeb) return;
     final db = await database;
     await db.insert('sensor_history', {
       'voltage': data.voltage,
@@ -243,6 +251,7 @@ class DatabaseService {
   }
 
   Future<List<SensorData>> getSensorHistory(DateTime from, DateTime to) async {
+    if (kIsWeb) return [];
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'sensor_history',
@@ -262,6 +271,7 @@ class DatabaseService {
   }
 
   Future<void> deleteOldRecords() async {
+    if (kIsWeb) return;
     final db = await database;
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     await db.delete(
@@ -273,6 +283,7 @@ class DatabaseService {
 
   // Consumption Records
   Future<void> insertConsumptionRecord(ConsumptionRecord record) async {
+    if (kIsWeb) return;
     final db = await database;
     await db.insert('consumption_records', {
       'kwh': record.kwh,
@@ -284,6 +295,7 @@ class DatabaseService {
 
   Future<List<ConsumptionRecord>> getConsumptionByRange(
       DateTime from, DateTime to) async {
+    if (kIsWeb) return [];
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'consumption_records',
@@ -303,6 +315,7 @@ class DatabaseService {
   }
 
   Future<double> getTotalKwhThisMonth() async {
+    if (kIsWeb) return 0.0;
     final db = await database;
     final now = DateTime.now();
     final firstDayOfMonth =
@@ -315,6 +328,7 @@ class DatabaseService {
   }
 
   Future<double> getTotalCostThisMonth() async {
+    if (kIsWeb) return 0.0;
     final db = await database;
     final now = DateTime.now();
     final firstDayOfMonth =
@@ -333,6 +347,7 @@ class DatabaseService {
     required double current,
     required double maxCurrent,
   }) async {
+    if (kIsWeb) return;
     final db = await database;
     await db.insert('overcurrent_incidents', {
       'device_id': deviceId,
@@ -345,17 +360,20 @@ class DatabaseService {
 
   // Schedules
   Future<List<Schedule>> getSchedules() async {
+    if (kIsWeb) return [];
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query('schedules');
     return List.generate(maps.length, (i) => Schedule.fromMap(maps[i]));
   }
 
   Future<int> insertSchedule(Schedule schedule) async {
+    if (kIsWeb) return 0;
     final db = await database;
     return await db.insert('schedules', schedule.toMap());
   }
 
   Future<void> updateSchedule(Schedule schedule) async {
+    if (kIsWeb) return;
     final db = await database;
     await db.update(
       'schedules',
@@ -366,6 +384,7 @@ class DatabaseService {
   }
 
   Future<void> deleteSchedule(int id) async {
+    if (kIsWeb) return;
     final db = await database;
     await db.delete('schedules', where: 'id = ?', whereArgs: [id]);
   }

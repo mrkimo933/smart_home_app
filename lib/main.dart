@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 import 'core/utils/platform/platform_io.dart' as platform_io;
 
@@ -18,6 +17,7 @@ import 'providers/system_provider.dart';
 import 'providers/consumption_provider.dart';
 import 'core/utils/app_lifecycle_handler.dart';
 import 'core/utils/relay_sync_listener.dart';
+import 'core/utils/smart_morning_checker.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/devices/screens/devices_screen.dart';
 import 'features/analytics/screens/analytics_screen.dart';
@@ -31,20 +31,18 @@ final navigationIndexProvider = StateProvider<int>((ref) => 0);
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (kIsWeb) {
-    // For web, use the web sqlite implementation.
-    databaseFactory = databaseFactoryFfiWeb;
-  } else {
-    // For desktop platforms, use sqflite_common_ffi.
+  // Only initialize sqflite on non-web platforms
+  // sqflite_common_ffi_web causes a WebAssembly crash on Chrome
+  if (!kIsWeb) {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
-    // Touch Platform through an IO-only wrapper so the analyzer doesn't tree-shake it.
-    // (No-op at runtime.)
     platform_io.isDesktop;
-  }
 
-  // Initialize notification service
-  await NotificationService().init();
+    // flutter_local_notifications is not supported on web
+    try {
+      await NotificationService().init();
+    } catch (_) {}
+  }
 
   runApp(
     const ProviderScope(
@@ -68,7 +66,10 @@ class MyApp extends ConsumerWidget {
     ref.read(systemProvider);
     // Ensure lifecycle handler is active
     ref.read(appLifecycleProvider(ref));
+    // Smart morning notifications
+    ref.read(smartMorningProvider);
     final language = ref.watch(languageProvider);
+
     
     return MaterialApp(
       title: AppStrings.getString(language, 'appName'),

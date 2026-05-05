@@ -9,6 +9,7 @@ import '../../../providers/devices_provider.dart';
 import '../../../providers/mqtt_provider.dart';
 import '../widgets/setting_tile.dart';
 import '../../devices/widgets/device_edit_dialog.dart';
+import '../../simulation/simulation_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -239,6 +240,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   builder: (context) => DeviceEditDialog(device: device),
                 ),
               )).toList(),
+            ),
+            _buildSection(
+              'وضع العرض التجريبي',
+              [
+                SettingTile(
+                  icon: Icons.science_rounded,
+                  title: 'وضع المحاكاة',
+                  subtitle: 'وضع العرض التجريبي - للجنة فقط',
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withAlpha(30),
+                      borderRadius: BorderRadius.circular(10),
+                      border:
+                          Border.all(color: Colors.orange.withAlpha(80)),
+                    ),
+                    child: const Text(
+                      'تجريبي',
+                      style: TextStyle(
+                          color: Colors.orange,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const SimulationScreen()),
+                  ),
+                ),
+              ],
             ),
             _buildSection(
               'App Preferences',
