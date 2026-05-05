@@ -1,3 +1,5 @@
+const _$sentinel = Object();
+
 enum DevicePriority { essential, normal, nonEssential }
 
 class Device {
@@ -9,6 +11,16 @@ class Device {
   final DevicePriority priority;
   final int totalOnMinutesToday;
   final int relayId;
+  // Feature 3: Per-device budget
+  final double? monthlyBudgetEGP;
+  final bool autoOffOnBudget;
+  // Feature 4: Overcurrent protection
+  final double maxCurrentAmps;
+  // Feature 6 & 7: Device timer
+  final int? timerMinutes;
+  final DateTime? timerStartTime;
+  // For run-by-budget label
+  final double? runBudgetEGP;
 
   Device({
     required this.id,
@@ -19,7 +31,49 @@ class Device {
     required this.priority,
     required this.totalOnMinutesToday,
     required this.relayId,
-  });
+    this.monthlyBudgetEGP,
+    this.autoOffOnBudget = false,
+    double? maxCurrentAmps,
+    this.timerMinutes,
+    this.timerStartTime,
+    this.runBudgetEGP,
+  }) : maxCurrentAmps = maxCurrentAmps ?? _defaultMaxCurrent(icon);
+
+  static double defaultMaxCurrentForIcon(String icon) =>
+      _defaultMaxCurrent(icon);
+
+  static double _defaultMaxCurrent(String icon) {
+    switch (icon.toLowerCase()) {
+      case 'lamp':
+      case 'lightbulb':
+        return 0.5;
+      case 'ac':
+      case 'ac_unit':
+        return 8.0;
+      case 'tv':
+        return 1.0;
+      case 'fan':
+        return 0.5;
+      case 'fridge':
+      case 'kitchen':
+        return 2.0;
+      case 'washer':
+      case 'washing_machine':
+      case 'local_laundry_service':
+        return 5.0;
+      case 'pc':
+      case 'computer':
+        return 3.0;
+      case 'heater':
+      case 'water_heater':
+      case 'hot_tub':
+        return 13.0;
+      case 'microwave':
+        return 6.0;
+      default:
+        return 10.0;
+    }
+  }
 
   factory Device.fromJson(Map<String, dynamic> json) {
     return Device(
@@ -34,6 +88,14 @@ class Device {
       ),
       totalOnMinutesToday: json['totalOnMinutesToday'] as int,
       relayId: json['relayId'] as int,
+      monthlyBudgetEGP: (json['monthlyBudgetEGP'] as num?)?.toDouble(),
+      autoOffOnBudget: (json['autoOffOnBudget'] as bool?) ?? false,
+      maxCurrentAmps: (json['maxCurrentAmps'] as num?)?.toDouble(),
+      timerMinutes: json['timerMinutes'] as int?,
+      timerStartTime: json['timerStartTime'] != null
+          ? DateTime.tryParse(json['timerStartTime'] as String)
+          : null,
+      runBudgetEGP: (json['runBudgetEGP'] as num?)?.toDouble(),
     );
   }
 
@@ -47,6 +109,12 @@ class Device {
       'priority': priority.name,
       'totalOnMinutesToday': totalOnMinutesToday,
       'relayId': relayId,
+      'monthlyBudgetEGP': monthlyBudgetEGP,
+      'autoOffOnBudget': autoOffOnBudget,
+      'maxCurrentAmps': maxCurrentAmps,
+      'timerMinutes': timerMinutes,
+      'timerStartTime': timerStartTime?.toIso8601String(),
+      'runBudgetEGP': runBudgetEGP,
     };
   }
 
@@ -59,6 +127,12 @@ class Device {
     DevicePriority? priority,
     int? totalOnMinutesToday,
     int? relayId,
+    Object? monthlyBudgetEGP = _$sentinel,
+    bool? autoOffOnBudget,
+    double? maxCurrentAmps,
+    Object? timerMinutes = _$sentinel,
+    Object? timerStartTime = _$sentinel,
+    Object? runBudgetEGP = _$sentinel,
   }) {
     return Device(
       id: id ?? this.id,
@@ -69,6 +143,20 @@ class Device {
       priority: priority ?? this.priority,
       totalOnMinutesToday: totalOnMinutesToday ?? this.totalOnMinutesToday,
       relayId: relayId ?? this.relayId,
+      monthlyBudgetEGP: identical(monthlyBudgetEGP, _$sentinel)
+          ? this.monthlyBudgetEGP
+          : monthlyBudgetEGP as double?,
+      autoOffOnBudget: autoOffOnBudget ?? this.autoOffOnBudget,
+      maxCurrentAmps: maxCurrentAmps ?? this.maxCurrentAmps,
+      timerMinutes: identical(timerMinutes, _$sentinel)
+          ? this.timerMinutes
+          : timerMinutes as int?,
+      timerStartTime: identical(timerStartTime, _$sentinel)
+          ? this.timerStartTime
+          : timerStartTime as DateTime?,
+      runBudgetEGP: identical(runBudgetEGP, _$sentinel)
+          ? this.runBudgetEGP
+          : runBudgetEGP as double?,
     );
   }
 

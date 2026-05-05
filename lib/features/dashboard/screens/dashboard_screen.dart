@@ -22,14 +22,20 @@ class DashboardScreen extends ConsumerWidget {
     final sensorDataAsync = ref.watch(sensorDataProvider);
     final isConnectedAsync = ref.watch(connectionStatusProvider);
     final language = ref.watch(languageProvider);
+    final voltageStatus = ref.watch(voltageStatusProvider);
+    final voltage = sensorDataAsync.value?.voltage ?? 0.0;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(AppStrings.getString(language, 'dashboard')),
         actions: [
+          // Feature 5: voltage status indicator
+          _VoltageIndicator(status: voltageStatus, voltage: voltage),
+          const SizedBox(width: 8),
           isConnectedAsync.when(
             data: (isConnected) => _ConnectionBadge(isConnected: isConnected),
-            loading: () => const _ConnectionBadge(isConnected: false, isConnecting: true),
+            loading: () =>
+                const _ConnectionBadge(isConnected: false, isConnecting: true),
             error: (_, __) => const _ConnectionBadge(isConnected: false),
           ),
           const SizedBox(width: 16),
@@ -45,14 +51,63 @@ class DashboardScreen extends ConsumerWidget {
               child: const Text(
                 'Offline - showing last known data. Connect to control.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          // Feature 5: voltage warning banner
+          if (voltageStatus == VoltageStatus.high)
+            Container(
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+              color: Colors.red.shade900,
+              child: Row(
+                children: [
+                  const Icon(Icons.dangerous_rounded,
+                      color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '🚨 HIGH VOLTAGE: ${voltage.toStringAsFixed(0)}V — Non-essential devices disconnected.',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (voltageStatus == VoltageStatus.low)
+            Container(
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+              color: Colors.orange.shade900,
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '⚠️ LOW VOLTAGE: ${voltage.toStringAsFixed(0)}V — May damage sensitive devices.',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13),
+                    ),
+                  ),
+                ],
               ),
             ),
           Expanded(
             child: sensorDataAsync.when(
               data: (data) => _buildContent(context, data),
               loading: () => _buildLoadingState(context),
-              error: (err, stack) => _buildErrorState(context, err.toString(), ref),
+              error: (err, stack) =>
+                  _buildErrorState(context, err.toString(), ref),
             ),
           ),
         ],
@@ -440,6 +495,52 @@ class DashboardScreen extends ConsumerWidget {
           },
         ),
       ],
+    );
+  }
+}
+
+// Feature 5: Voltage status indicator in app bar
+class _VoltageIndicator extends StatelessWidget {
+  final VoltageStatus status;
+  final double voltage;
+
+  const _VoltageIndicator({required this.status, required this.voltage});
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == VoltageStatus.unknown || voltage == 0.0) {
+      return const SizedBox.shrink();
+    }
+    Color color;
+    String icon;
+    switch (status) {
+      case VoltageStatus.normal:
+        color = Colors.green;
+        icon = '✅';
+        break;
+      case VoltageStatus.low:
+        color = Colors.orange;
+        icon = '⚠️';
+        break;
+      case VoltageStatus.high:
+        color = Colors.red;
+        icon = '🚨';
+        break;
+      default:
+        return const SizedBox.shrink();
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withAlpha((0.15 * 255).toInt()),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color, width: 1),
+      ),
+      child: Text(
+        '$icon ${voltage.toStringAsFixed(0)}V',
+        style: TextStyle(
+            color: color, fontSize: 12, fontWeight: FontWeight.bold),
+      ),
     );
   }
 }

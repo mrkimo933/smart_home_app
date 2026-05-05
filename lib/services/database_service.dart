@@ -25,8 +25,9 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'smart_home_monitor.db');
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -40,7 +41,13 @@ class DatabaseService {
         is_on INTEGER,
         priority TEXT,
         total_on_minutes_today INTEGER,
-        relay_id INTEGER
+        relay_id INTEGER,
+        monthly_budget_egp REAL,
+        auto_off_on_budget INTEGER DEFAULT 0,
+        max_current_amps REAL,
+        timer_minutes INTEGER,
+        timer_start_time TEXT,
+        run_budget_egp REAL
       )
     ''');
 
@@ -79,23 +86,107 @@ class DatabaseService {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE overcurrent_incidents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_id INTEGER,
+        device_name TEXT,
+        current REAL,
+        max_current REAL,
+        timestamp TEXT
+      )
+    ''');
+
     await _initDefaultDevices(db);
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add new device fields
+      final columns = [
+        'ALTER TABLE devices ADD COLUMN monthly_budget_egp REAL',
+        'ALTER TABLE devices ADD COLUMN auto_off_on_budget INTEGER DEFAULT 0',
+        'ALTER TABLE devices ADD COLUMN max_current_amps REAL',
+        'ALTER TABLE devices ADD COLUMN timer_minutes INTEGER',
+        'ALTER TABLE devices ADD COLUMN timer_start_time TEXT',
+        'ALTER TABLE devices ADD COLUMN run_budget_egp REAL',
+      ];
+      for (final sql in columns) {
+        try {
+          await db.execute(sql);
+        } catch (_) {
+          // Column may already exist
+        }
+      }
+
+      // Create overcurrent incidents table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS overcurrent_incidents (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          device_id INTEGER,
+          device_name TEXT,
+          current REAL,
+          max_current REAL,
+          timestamp TEXT
+        )
+      ''');
+    }
   }
 
   Future<void> _initDefaultDevices(Database db) async {
     final devices = Device.defaultDevices;
     for (var device in devices) {
-      await db.insert('devices', {
-        'id': device.id,
-        'name': device.name,
-        'icon': device.icon,
-        'wattage': device.wattage,
-        'is_on': device.isOn ? 1 : 0,
-        'priority': device.priority.name,
-        'total_on_minutes_today': device.totalOnMinutesToday,
-        'relay_id': device.relayId,
-      });
+      await db.insert('devices', _deviceToMap(device));
     }
+  }
+
+  Map<String, dynamic> _deviceToMap(Device device) {
+    return {
+      'id': device.id,
+      'name': device.name,
+      'icon': device.icon,
+      'wattage': device.wattage,
+      'is_on': device.isOn ? 1 : 0,
+      'priority': device.priority.name,
+      'total_on_minutes_today': device.totalOnMinutesToday,
+      'relay_id': device.relayId,
+      'monthly_budget_egp': device.monthlyBudgetEGP,
+      'auto_off_on_budget': device.autoOffOnBudget ? 1 : 0,
+      'max_current_amps': device.maxCurrentAmps,
+      'timer_minutes': device.timerMinutes,
+      'timer_start_time': device.timerStartTime?.toIso8601String(),
+      'run_budget_egp': device.runBudgetEGP,
+    };
+  }
+
+  Device _deviceFromMap(Map<String, dynamic> m) {
+    return Device(
+      id: m['id'] as int,
+      name: m['name'] as String,
+      icon: m['icon'] as String,
+      wattage: (m['wattage'] as num).toDouble(),
+      isOn: m['is_on'] == 1,
+      priority: DevicePriority.values.firstWhere(
+        (e) => e.name == m['priority'],
+        orElse: () => DevicePriority.normal,
+      ),
+      totalOnMinutesToday: m['total_on_minutes_today'] as int,
+      relayId: m['relay_id'] as int,
+      monthlyBudgetEGP: m['monthly_budget_egp'] != null
+          ? (m['monthly_budget_egp'] as num).toDouble()
+          : null,
+      autoOffOnBudget: m['auto_off_on_budget'] == 1,
+      maxCurrentAmps: m['max_current_amps'] != null
+          ? (m['max_current_amps'] as num).toDouble()
+          : null,
+      timerMinutes: m['timer_minutes'] as int?,
+      timerStartTime: m['timer_start_time'] != null
+          ? DateTime.tryParse(m['timer_start_time'] as String)
+          : null,
+      runBudgetEGP: m['run_budget_egp'] != null
+          ? (m['run_budget_egp'] as num).toDouble()
+          : null,
+    );
   }
 
   // Public init for checking if empty
@@ -111,50 +202,24 @@ class DatabaseService {
   Future<List<Device>> getDevices() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query('devices');
-    return List.generate(maps.length, (i) {
-      return Device(
-        id: maps[i]['id'],
-        name: maps[i]['name'],
-        icon: maps[i]['icon'],
-        wattage: maps[i]['wattage'],
-        isOn: maps[i]['is_on'] == 1,
-        priority: DevicePriority.values.firstWhere(
-          (e) => e.name == maps[i]['priority'],
-          orElse: () => DevicePriority.normal,
-        ),
-        totalOnMinutesToday: maps[i]['total_on_minutes_today'],
-        relayId: maps[i]['relay_id'],
-      );
-    });
+    return maps.map(_deviceFromMap).toList();
   }
 
   Future<void> insertDevice(Device device) async {
     final db = await database;
-    await db.insert('devices', {
-      'id': device.id,
-      'name': device.name,
-      'icon': device.icon,
-      'wattage': device.wattage,
-      'is_on': device.isOn ? 1 : 0,
-      'priority': device.priority.name,
-      'total_on_minutes_today': device.totalOnMinutesToday,
-      'relay_id': device.relayId,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      'devices',
+      _deviceToMap(device),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<void> updateDevice(Device device) async {
     final db = await database;
+    final map = _deviceToMap(device)..remove('id');
     await db.update(
       'devices',
-      {
-        'name': device.name,
-        'icon': device.icon,
-        'wattage': device.wattage,
-        'is_on': device.isOn ? 1 : 0,
-        'priority': device.priority.name,
-        'total_on_minutes_today': device.totalOnMinutesToday,
-        'relay_id': device.relayId,
-      },
+      map,
       where: 'id = ?',
       whereArgs: [device.id],
     );
@@ -162,11 +227,7 @@ class DatabaseService {
 
   Future<void> deleteDevice(int id) async {
     final db = await database;
-    await db.delete(
-      'devices',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await db.delete('devices', where: 'id = ?', whereArgs: [id]);
   }
 
   // Sensor History
@@ -191,22 +252,22 @@ class DatabaseService {
     );
     return List.generate(maps.length, (i) {
       return SensorData(
-        voltage: maps[i]['voltage'],
-        current: maps[i]['current'],
-        power: maps[i]['power'],
-        kwh: maps[i]['kwh'],
-        timestamp: DateTime.parse(maps[i]['timestamp']),
+        voltage: maps[i]['voltage'] as double,
+        current: maps[i]['current'] as double,
+        power: maps[i]['power'] as double,
+        kwh: maps[i]['kwh'] as double,
+        timestamp: DateTime.parse(maps[i]['timestamp'] as String),
       );
     });
   }
 
   Future<void> deleteOldRecords() async {
     final db = await database;
-    final sixtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     await db.delete(
       'sensor_history',
       where: 'timestamp < ?',
-      whereArgs: [sixtyDaysAgo.toIso8601String()],
+      whereArgs: [thirtyDaysAgo.toIso8601String()],
     );
   }
 
@@ -221,7 +282,8 @@ class DatabaseService {
     });
   }
 
-  Future<List<ConsumptionRecord>> getConsumptionByRange(DateTime from, DateTime to) async {
+  Future<List<ConsumptionRecord>> getConsumptionByRange(
+      DateTime from, DateTime to) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'consumption_records',
@@ -231,11 +293,11 @@ class DatabaseService {
     );
     return List.generate(maps.length, (i) {
       return ConsumptionRecord(
-        id: maps[i]['id'],
-        kwh: maps[i]['kwh'],
-        costEGP: maps[i]['cost_egp'],
-        date: DateTime.parse(maps[i]['date']),
-        deviceId: maps[i]['device_id'],
+        id: maps[i]['id'] as int,
+        kwh: (maps[i]['kwh'] as num).toDouble(),
+        costEGP: (maps[i]['cost_egp'] as num).toDouble(),
+        date: DateTime.parse(maps[i]['date'] as String),
+        deviceId: maps[i]['device_id'] as int,
       );
     });
   }
@@ -243,27 +305,42 @@ class DatabaseService {
   Future<double> getTotalKwhThisMonth() async {
     final db = await database;
     final now = DateTime.now();
-    final firstDayOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
-    
+    final firstDayOfMonth =
+        DateTime(now.year, now.month, 1).toIso8601String();
     final result = await db.rawQuery(
       'SELECT SUM(kwh) as total FROM consumption_records WHERE date >= ?',
       [firstDayOfMonth],
     );
-    
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
   Future<double> getTotalCostThisMonth() async {
     final db = await database;
     final now = DateTime.now();
-    final firstDayOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
-    
+    final firstDayOfMonth =
+        DateTime(now.year, now.month, 1).toIso8601String();
     final result = await db.rawQuery(
       'SELECT SUM(cost_egp) as total FROM consumption_records WHERE date >= ?',
       [firstDayOfMonth],
     );
-    
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  // Overcurrent incidents log
+  Future<void> logOvercurrentIncident({
+    required int deviceId,
+    required String deviceName,
+    required double current,
+    required double maxCurrent,
+  }) async {
+    final db = await database;
+    await db.insert('overcurrent_incidents', {
+      'device_id': deviceId,
+      'device_name': deviceName,
+      'current': current,
+      'max_current': maxCurrent,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
   }
 
   // Schedules
@@ -290,10 +367,6 @@ class DatabaseService {
 
   Future<void> deleteSchedule(int id) async {
     final db = await database;
-    await db.delete(
-      'schedules',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+    await db.delete('schedules', where: 'id = ?', whereArgs: [id]);
   }
 }

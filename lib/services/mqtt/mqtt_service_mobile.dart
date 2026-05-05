@@ -50,15 +50,38 @@ class MqttServiceMobile implements MqttServiceInterface {
   Future<void> connect() async {
     _isManuallyDisconnected = false;
     final prefs = await SharedPreferences.getInstance();
-    final brokerIp = prefs.getString('mqtt_broker_ip') ?? '192.168.1.100';
     
+    // تعديل Host: منع أي زوائد في الـ الرابط
+    // تعديل Host: منع أي زوائد في الـ الرابط (مثل البورت أو البروتوكول)
+    String rawIp = prefs.getString('mqtt_broker_ip') ?? 'broker.hivemq.com';
+    String brokerIp = rawIp
+        .replaceAll('mqtt://', '')
+        .replaceAll('tcp://', '')
+        .replaceAll('ws://', '')
+        .replaceAll('wss://', '')
+        .split(':')
+        .first;
+    
+    final port = prefs.getInt('mqtt_broker_port') ?? 1883;
+    final username = prefs.getString('mqtt_username') ?? '';
+    final password = prefs.getString('mqtt_password') ?? '';
+
+    // تحديد نوع الـ Client
     _client = MqttServerClient(brokerIp, _clientId);
-    _client!.port = 1883;
+    _client!.port = port;
+    
+    // تعطيل التشفير وتفعيله فقط إذا كان البورت 8883
+    _client!.secure = false;
+    if (port == 8883) {
+      _client!.secure = true;
+      _client!.onBadCertificate = (dynamic cert) => true;
+    }
+
     _client!.keepAlivePeriod = 20;
     _client!.onDisconnected = _onDisconnected;
     _client!.onConnected = _onConnected;
     _client!.onSubscribed = _onSubscribed;
-    _client!.logging(on: false);
+    _client!.logging(on: true);
 
     final connMess = MqttConnectMessage()
         .withClientIdentifier(_clientId)
@@ -67,18 +90,30 @@ class MqttServiceMobile implements MqttServiceInterface {
         .startClean()
         .withWillQos(MqttQos.atLeastOnce);
     
+    if (username.isNotEmpty && password.isNotEmpty) {
+      connMess.authenticateAs(username, password);
+    }
+    
     _client!.connectionMessage = connMess;
 
     try {
-      await _client!.connect();
+      // ignore: avoid_print
+      print('MQTT: Connecting to $brokerIp:$port...');
+      if (username.isNotEmpty && password.isNotEmpty) {
+        await _client!.connect(username, password);
+      } else {
+        await _client!.connect();
+      }
     } catch (e) {
+      // ignore: avoid_print
+      print('MQTT: Exception $e');
+      _client!.disconnect();
       _connectionStatusController.add(false);
       _scheduleReconnect();
     }
 
     if (_client?.connectionStatus?.state == MqttConnectionState.connected) {
-      _onConnected();
-      
+      // 1. إعداد الـ listener أولاً قبل الاشتراك لضمان عدم ضياع أول رسالة
       _client!.updates!.listen((List<MqttReceivedMessage<MqttMessage>> c) {
         final MqttPublishMessage recMess = c[0].payload as MqttPublishMessage;
         final String payload = MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
@@ -86,6 +121,9 @@ class MqttServiceMobile implements MqttServiceInterface {
         
         _handleMessage(topic, payload);
       });
+
+      // 2. تفعيل التنبيه بالاتصال والاشتراك في الـ topics
+      _onConnected();
     } else {
       _connectionStatusController.add(false);
       _scheduleReconnect();
@@ -93,27 +131,39 @@ class MqttServiceMobile implements MqttServiceInterface {
   }
 
   void _handleMessage(String topic, String payload) {
+    // ignore: avoid_print
+    print('MQTT Received -> Topic: $topic, Payload: $payload');
+    
     bool sensorUpdated = false;
-    double? val = double.tryParse(payload);
+    // تنظيف الـ payload من أي مسافات زائدة
+    final cleanPayload = payload.trim();
+    double? val = double.tryParse(cleanPayload);
 
-    if (topic == MqttTopics.voltage) {
+    // معالجة الـ topic بشكل مرن (يتعامل مع وجود / في البداية)
+    final normalizedTopic = topic.startsWith('/') ? topic.substring(1) : topic;
+    final voltageTopic = MqttTopics.voltage.startsWith('/') ? MqttTopics.voltage.substring(1) : MqttTopics.voltage;
+    final currentTopic = MqttTopics.current.startsWith('/') ? MqttTopics.current.substring(1) : MqttTopics.current;
+    final powerTopic = MqttTopics.power.startsWith('/') ? MqttTopics.power.substring(1) : MqttTopics.power;
+    final kwhTopic = MqttTopics.kwh.startsWith('/') ? MqttTopics.kwh.substring(1) : MqttTopics.kwh;
+
+    if (normalizedTopic == voltageTopic) {
       _voltage = val ?? 0.0;
       sensorUpdated = true;
-    } else if (topic == MqttTopics.current) {
+    } else if (normalizedTopic == currentTopic) {
       _current = val ?? 0.0;
       sensorUpdated = true;
-    } else if (topic == MqttTopics.power) {
+    } else if (normalizedTopic == powerTopic) {
       _power = val ?? 0.0;
       sensorUpdated = true;
-    } else if (topic == MqttTopics.kwh) {
+    } else if (normalizedTopic == kwhTopic) {
       _kwh = val ?? 0.0;
       sensorUpdated = true;
-    } else if (topic.startsWith('esp/relay/')) {
-      final parts = topic.split('/');
+    } else if (normalizedTopic.startsWith('esp/relay/')) {
+      final parts = normalizedTopic.split('/');
       if (parts.length >= 3) {
         final id = int.tryParse(parts[2]);
         if (id != null) {
-          _relayStates[id] = payload.toUpperCase() == 'ON';
+          _relayStates[id] = cleanPayload.toUpperCase() == 'ON';
           _relayStatesController.add(Map.unmodifiable(_relayStates));
         }
       }
@@ -135,7 +185,7 @@ class MqttServiceMobile implements MqttServiceInterface {
           try {
             await DatabaseService().insertSensorData(_latestSensorData!);
           } catch (e) {
-            // Log error or handle silently in production
+            // Log error
           }
           _latestSensorData = null;
         }
@@ -189,6 +239,8 @@ class MqttServiceMobile implements MqttServiceInterface {
   }
 
   void _onSubscribed(String topic) {
+    // ignore: avoid_print
+    print('MQTT Subscribed successfully to: $topic');
   }
 
   @override

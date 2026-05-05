@@ -10,7 +10,6 @@ class DevicesNotifier extends StateNotifier<List<Device>> {
   final DatabaseService _dbService;
 
   DevicesNotifier(this._dbService) : super([]) {
-    // Initial state with some defaults while we wait for DB
     state = _getDefaultDevices();
     loadDevices();
   }
@@ -36,8 +35,9 @@ class DevicesNotifier extends StateNotifier<List<Device>> {
   }
 
   Future<void> addDevice(Device device) async {
-    // Basic ID generation: find max id and add 1
-    final newId = state.isEmpty ? 1 : state.map((d) => d.id).reduce((a, b) => a > b ? a : b) + 1;
+    final newId = state.isEmpty
+        ? 1
+        : state.map((d) => d.id).reduce((a, b) => a > b ? a : b) + 1;
     final deviceWithId = device.copyWith(id: newId);
     await _dbService.insertDevice(deviceWithId);
     state = [...state, deviceWithId];
@@ -58,23 +58,59 @@ class DevicesNotifier extends StateNotifier<List<Device>> {
 
   Future<void> toggleDevice(int relayId, bool isOn) async {
     final index = state.indexWhere((d) => d.relayId == relayId);
-    if (index != -1) {
-      final device = state[index].copyWith(isOn: isOn);
-      await updateDevice(device);
-    }
+    if (index == -1) return;
+    final device = state[index].copyWith(isOn: isOn);
+    await updateDevice(device);
   }
 
   Future<void> updateOnTime(int relayId, int minutes) async {
     final index = state.indexWhere((d) => d.relayId == relayId);
-    if (index != -1) {
-      final device = state[index].copyWith(
-        totalOnMinutesToday: state[index].totalOnMinutesToday + minutes,
-      );
-      await updateDevice(device);
-    }
+    if (index == -1) return;
+    final device = state[index].copyWith(
+      totalOnMinutesToday: state[index].totalOnMinutesToday + minutes,
+    );
+    await updateDevice(device);
+  }
+
+  // Feature 6: Device timer
+  Future<void> setDeviceTimer(int deviceId, int minutes) async {
+    final index = state.indexWhere((d) => d.id == deviceId);
+    if (index == -1) return;
+    final device = state[index].copyWith(
+      timerMinutes: minutes,
+      timerStartTime: DateTime.now(),
+      isOn: true,
+    );
+    await updateDevice(device);
+  }
+
+  Future<void> clearDeviceTimer(int deviceId) async {
+    final index = state.indexWhere((d) => d.id == deviceId);
+    if (index == -1) return;
+    final device = state[index].copyWith(
+      timerMinutes: null,
+      timerStartTime: null,
+      isOn: false,
+      runBudgetEGP: null,
+    );
+    await updateDevice(device);
+  }
+
+  // Feature 7: Run by budget — sets a timer based on budget calculation
+  Future<void> setRunByBudget(int deviceId, int timerMinutes, double budgetEGP) async {
+    final index = state.indexWhere((d) => d.id == deviceId);
+    if (index == -1) return;
+    final device = state[index].copyWith(
+      timerMinutes: timerMinutes,
+      timerStartTime: DateTime.now(),
+      isOn: true,
+      runBudgetEGP: budgetEGP,
+    );
+    await updateDevice(device);
   }
 }
 
-final devicesProvider = StateNotifierProvider<DevicesNotifier, List<Device>>((ref) {
+final devicesProvider =
+    StateNotifierProvider<DevicesNotifier, List<Device>>((ref) {
   return DevicesNotifier(ref.watch(databaseServiceProvider));
 });

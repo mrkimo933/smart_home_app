@@ -15,6 +15,7 @@ import 'services/notification_service.dart';
 import 'core/constants/app_strings.dart';
 import 'providers/mqtt_provider.dart';
 import 'providers/system_provider.dart';
+import 'providers/consumption_provider.dart';
 import 'core/utils/app_lifecycle_handler.dart';
 import 'core/utils/relay_sync_listener.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
@@ -61,6 +62,8 @@ class MyApp extends ConsumerWidget {
     ref.read(relaySyncProvider);
     // Ensure relay search sync listener is active
     ref.read(relaySyncListenerProvider);
+    // Activate house budget alert listener
+    ref.read(houseBudgetAlertProvider);
     // Ensure system provider is read so midnight reset and other tasks run
     ref.read(systemProvider);
     // Ensure lifecycle handler is active

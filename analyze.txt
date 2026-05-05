@@ -1,0 +1,56 @@
+Resolving dependencies...
+Downloading packages...
+  csv 6.0.0 (8.0.0 available)
+  fl_chart 0.65.0 (1.2.0 available)
+  flutter_lints 3.0.2 (6.0.0 available)
+  flutter_local_notifications 17.2.4 (21.0.0 available)
+  flutter_local_notifications_linux 4.0.1 (8.0.0 available)
+  flutter_local_notifications_platform_interface 7.2.0 (11.0.0 available)
+  flutter_riverpod 2.6.1 (3.3.1 available)
+  hooks 1.0.2 (1.0.3 available)
+  lints 3.0.0 (6.1.0 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.17.0 (1.18.2 available)
+  mqtt_client 10.11.10 (10.11.11 available)
+  native_toolchain_c 0.17.6 (0.18.0 available)
+  path_provider_android 2.2.23 (2.3.1 available)
+  riverpod 2.6.1 (3.2.1 available)
+  share_plus 10.1.4 (13.1.0 available)
+  share_plus_platform_interface 5.0.2 (7.1.0 available)
+  sqflite 2.4.2 (2.4.2+1 available)
+  sqflite_common 2.5.6 (2.5.6+1 available)
+  synchronized 3.4.0 (3.4.0+1 available)
+  test_api 0.7.10 (0.7.12 available)
+  timezone 0.9.4 (0.11.0 available)
+  vector_math 2.2.0 (2.3.0 available)
+  vm_service 15.0.2 (15.2.0 available)
+  win32 5.15.0 (6.1.0 available)
+  xml 6.6.1 (7.0.1 available)
+Got dependencies!
+26 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Analyzing smart_home_app...                                     
+
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/devices/widgets/device_card.dart:433:45 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/devices/widgets/device_card.dart:434:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/devices/widgets/device_card.dart:440:54 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/devices/widgets/device_card.dart:458:53 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/devices/widgets/device_card.dart:459:42 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/devices/widgets/device_card.dart:526:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/features/devices/widgets/device_card.dart:640:43 • deprecated_member_use
+warning • The value of the local variable 'recommendedDailyKwh' isn't used • lib/features/energy_saving/screens/energy_saving_screen.dart:255:11 • unused_local_variable
+warning • The value of the local variable 'daysRemaining' isn't used • lib/features/energy_saving/screens/energy_saving_screen.dart:262:11 • unused_local_variable
+warning • The value of the local variable 'overspend' isn't used • lib/features/energy_saving/screens/energy_saving_screen.dart:265:11 • unused_local_variable
+warning • The value of the local variable 'isOverspending' isn't used • lib/features/energy_saving/screens/energy_saving_screen.dart:266:11 • unused_local_variable
+   info • Don't invoke 'print' in production code • lib/providers/mqtt_provider.dart:54:7 • avoid_print
+  error • The setter 'badCertificateCallback' isn't defined for the type 'MqttServerClient' • lib/services/mqtt/mqtt_service_mobile.dart:77:16 • undefined_setter
+   info • Don't invoke 'print' in production code • lib/services/mqtt/mqtt_service_mobile.dart:100:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/mqtt/mqtt_service_mobile.dart:107:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/mqtt/mqtt_service_mobile.dart:132:5 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/mqtt/mqtt_service_mobile.dart:239:5 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/mqtt/mqtt_service_web.dart:93:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/mqtt/mqtt_service_web.dart:100:7 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/mqtt/mqtt_service_web.dart:124:5 • avoid_print
+   info • Don't invoke 'print' in production code • lib/services/mqtt/mqtt_service_web.dart:217:5 • avoid_print
+  error • The setter 'badCertificateCallback' isn't defined for the type 'MqttServerClient' • lib/services/mqtt_service.dart:72:16 • undefined_setter
+

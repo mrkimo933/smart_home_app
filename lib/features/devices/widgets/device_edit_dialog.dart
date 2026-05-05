@@ -18,37 +18,49 @@ class DeviceEditDialog extends ConsumerStatefulWidget {
 class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
   late TextEditingController _nameController;
   late TextEditingController _wattageController;
+  late TextEditingController _budgetController;
+  late TextEditingController _maxCurrentController;
   String _selectedIcon = 'lamp';
   DevicePriority _priority = DevicePriority.normal;
   int _selectedRelay = 1;
+  bool _hasBudget = false;
+  bool _autoOffOnBudget = false;
 
   final List<String> _icons = [
-    'lamp', 'ac', 'tv', 'fan', 'fridge', 'washer', 'pc', 'router', 'heater', 'microwave', 'water_heater', 'coffee_maker'
+    'lamp', 'ac', 'tv', 'fan', 'fridge', 'washer', 'pc', 'router',
+    'heater', 'microwave', 'water_heater', 'coffee_maker'
   ];
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.device?.name ?? '');
-    _wattageController = TextEditingController(text: widget.device?.wattage.toString() ?? '');
-    _selectedIcon = widget.device?.icon ?? 'lamp';
-    _priority = widget.device?.priority ?? DevicePriority.normal;
-    _selectedRelay = widget.device?.relayId ?? 1;
+    final d = widget.device;
+    _nameController = TextEditingController(text: d?.name ?? '');
+    _wattageController = TextEditingController(text: d?.wattage.toString() ?? '');
+    _budgetController = TextEditingController(
+        text: d?.monthlyBudgetEGP?.toStringAsFixed(0) ?? '');
+    _maxCurrentController = TextEditingController(
+        text: d?.maxCurrentAmps.toStringAsFixed(1) ?? '');
+    _selectedIcon = d?.icon ?? 'lamp';
+    _priority = d?.priority ?? DevicePriority.normal;
+    _selectedRelay = d?.relayId ?? 1;
+    _hasBudget = d?.monthlyBudgetEGP != null;
+    _autoOffOnBudget = d?.autoOffOnBudget ?? false;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _wattageController.dispose();
+    _budgetController.dispose();
+    _maxCurrentController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       decoration: const BoxDecoration(
         color: AppColors.cardColor,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
@@ -65,19 +77,24 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 24),
                 decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2)),
               ),
             ),
-            Text(
-              widget.device == null ? 'Add New Device' : 'Edit Device',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  widget.device == null ? 'Add New Device' : 'Edit Device',
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                if (widget.device != null)
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                    onPressed: () => _handleDelete(context),
+                  ),
+              ],
             ),
             const SizedBox(height: 32),
             _buildTextField(
@@ -92,11 +109,17 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
               icon: Icons.bolt_rounded,
               keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 32),
-            const Text(
-              'Select Icon',
-              style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500),
+            const SizedBox(height: 20),
+            _buildTextField(
+              controller: _maxCurrentController,
+              label: 'Max Safe Current (A)',
+              icon: Icons.electrical_services_rounded,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
+            const SizedBox(height: 32),
+            // ── Icon picker ─────────────────────────────────────────────────
+            const Text('Select Icon',
+                style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
             const SizedBox(height: 16),
             SizedBox(
               height: 120,
@@ -112,15 +135,25 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
                   final icon = _icons[index];
                   final isSelected = _selectedIcon == icon;
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedIcon = icon),
+                    onTap: () => setState(() {
+                      _selectedIcon = icon;
+                      // Update max current default when icon changes
+                      if (_maxCurrentController.text.isEmpty) {
+                        _maxCurrentController.text =
+                            Device.defaultMaxCurrentForIcon(icon).toStringAsFixed(1);
+                      }
+                    }),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primaryBlue : Colors.white.withAlpha((0.05 * 255).toInt()),
+                        color: isSelected
+                            ? AppColors.primaryBlue
+                            : Colors.white.withAlpha((0.05 * 255).toInt()),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isSelected ? Colors.white30 : Colors.transparent,
-                        ),
+                            color: isSelected
+                                ? Colors.white30
+                                : Colors.transparent),
                       ),
                       child: _buildIcon(icon, isSelected),
                     ),
@@ -129,10 +162,9 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
               ),
             ),
             const SizedBox(height: 32),
-            const Text(
-              'Priority Level',
-              style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500),
-            ),
+            // ── Priority ────────────────────────────────────────────────────
+            const Text('Priority Level',
+                style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -144,10 +176,9 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
               ],
             ),
             const SizedBox(height: 32),
-            const Text(
-              'Relay ID (1-8)',
-              style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500),
-            ),
+            // ── Relay ID ────────────────────────────────────────────────────
+            const Text('Relay ID (1-8)',
+                style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w500)),
             const SizedBox(height: 16),
             SizedBox(
               height: 100,
@@ -163,11 +194,14 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primaryBlue : Colors.white.withAlpha((0.05 * 255).toInt()),
+                        color: isSelected
+                            ? AppColors.primaryBlue
+                            : Colors.white.withAlpha((0.05 * 255).toInt()),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: isSelected ? Colors.white30 : Colors.transparent,
-                        ),
+                            color: isSelected
+                                ? Colors.white30
+                                : Colors.transparent),
                       ),
                       child: Center(
                         child: Text(
@@ -184,7 +218,75 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
                 }).toList(),
               ),
             ),
+            const SizedBox(height: 32),
+            // ── Feature 3: Per-Device Budget Section ────────────────────────
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha((0.04 * 255).toInt()),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                    color: _hasBudget
+                        ? AppColors.primaryBlue.withAlpha((0.5 * 255).toInt())
+                        : Colors.white12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Monthly Device Budget',
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500),
+                      ),
+                      Switch(
+                        value: _hasBudget,
+                        onChanged: (val) => setState(() {
+                          _hasBudget = val;
+                          if (!val) _autoOffOnBudget = false;
+                        }),
+                        activeThumbColor: AppColors.primaryBlue,
+                        activeTrackColor:
+                            AppColors.primaryBlue.withAlpha((0.3 * 255).toInt()),
+                      ),
+                    ],
+                  ),
+                  if (_hasBudget) ...[
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _budgetController,
+                      label: 'Budget (EGP / month)',
+                      icon: Icons.account_balance_wallet_rounded,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Auto turn off when reached',
+                          style: TextStyle(color: Colors.white60, fontSize: 13),
+                        ),
+                        Switch(
+                          value: _autoOffOnBudget,
+                          onChanged: (val) =>
+                              setState(() => _autoOffOnBudget = val),
+                          activeThumbColor: Colors.orange,
+                          activeTrackColor:
+                              Colors.orange.withAlpha((0.3 * 255).toInt()),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
             const SizedBox(height: 48),
+            // ── Save / Delete ────────────────────────────────────────────────
             Row(
               children: [
                 if (widget.device != null) ...[
@@ -192,7 +294,8 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
                     child: ElevatedButton(
                       onPressed: () => _handleDelete(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent.withAlpha((0.1 * 255).toInt()),
+                        backgroundColor:
+                            Colors.redAccent.withAlpha((0.1 * 255).toInt()),
                         foregroundColor: Colors.redAccent,
                         padding: const EdgeInsets.symmetric(vertical: 18),
                         side: const BorderSide(color: Colors.redAccent),
@@ -210,11 +313,13 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
                       backgroundColor: AppColors.primaryBlue,
                       padding: const EdgeInsets.symmetric(vertical: 18),
                       elevation: 8,
-                      shadowColor: AppColors.primaryBlue.withAlpha((0.5 * 255).toInt()),
+                      shadowColor:
+                          AppColors.primaryBlue.withAlpha((0.5 * 255).toInt()),
                     ),
                     child: Text(
                       widget.device == null ? 'Add Device' : 'Save Changes',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ),
                 ),
@@ -263,10 +368,14 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
     }
 
     final double wattage = double.tryParse(_wattageController.text) ?? 0;
+    final double? budget =
+        _hasBudget ? double.tryParse(_budgetController.text) : null;
+    final double? maxCurrent =
+        double.tryParse(_maxCurrentController.text);
 
     if (widget.device == null) {
       final newDevice = Device(
-        id: DateTime.now().millisecondsSinceEpoch, // Use timestamp for unique ID
+        id: DateTime.now().millisecondsSinceEpoch,
         name: _nameController.text,
         wattage: wattage,
         icon: _selectedIcon,
@@ -274,6 +383,9 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
         priority: _priority,
         totalOnMinutesToday: 0,
         relayId: _selectedRelay,
+        monthlyBudgetEGP: budget,
+        autoOffOnBudget: _autoOffOnBudget,
+        maxCurrentAmps: maxCurrent,
       );
       ref.read(devicesProvider.notifier).addDevice(newDevice);
     } else {
@@ -283,6 +395,9 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
         icon: _selectedIcon,
         priority: _priority,
         relayId: _selectedRelay,
+        monthlyBudgetEGP: budget,
+        autoOffOnBudget: _autoOffOnBudget,
+        maxCurrentAmps: maxCurrent,
       );
       ref.read(devicesProvider.notifier).updateDevice(updated);
     }
@@ -295,24 +410,30 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Device?', style: TextStyle(color: Colors.white)),
-        content: const Text('Are you sure you want to delete this device?', style: TextStyle(color: Colors.white70)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Device?',
+            style: TextStyle(color: Colors.white)),
+        content: const Text('Are you sure you want to delete this device?',
+            style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white38)),
+            child: const Text('Cancel',
+                style: TextStyle(color: Colors.white38)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            child: const Text('Delete',
+                style: TextStyle(
+                    color: Colors.redAccent, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
     if (confirm == true) {
       ref.read(devicesProvider.notifier).deleteDevice(widget.device!.id);
-      navigator.pop(); // Close the bottom sheet
+      navigator.pop();
     }
   }
 
@@ -325,13 +446,20 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primaryBlue.withAlpha((0.2 * 255).toInt()) : Colors.white.withAlpha((0.05 * 255).toInt()),
+            color: isSelected
+                ? AppColors.primaryBlue.withAlpha((0.2 * 255).toInt())
+                : Colors.white.withAlpha((0.05 * 255).toInt()),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isSelected ? AppColors.primaryBlue : Colors.transparent),
+            border: Border.all(
+                color: isSelected ? AppColors.primaryBlue : Colors.transparent),
           ),
           child: Column(
             children: [
-              Icon(icon, color: isSelected ? AppColors.primaryBlue : Colors.white38, size: 20),
+              Icon(icon,
+                  color: isSelected
+                      ? AppColors.primaryBlue
+                      : Colors.white38,
+                  size: 20),
               const SizedBox(height: 4),
               Text(
                 label,
@@ -351,20 +479,44 @@ class _DeviceEditDialogState extends ConsumerState<DeviceEditDialog> {
   Widget _buildIcon(String iconName, bool isSelected) {
     IconData data;
     switch (iconName) {
-      case 'lamp': data = Icons.lightbulb_outline_rounded; break;
-      case 'ac': data = Icons.ac_unit_rounded; break;
-      case 'tv': data = Icons.tv_rounded; break;
-      case 'fan': data = Icons.air_rounded; break;
-      case 'fridge': data = Icons.kitchen_rounded; break;
-      case 'washer': data = Icons.local_laundry_service_rounded; break;
-      case 'pc': data = Icons.computer_rounded; break;
-      case 'router': data = Icons.router_rounded; break;
-      case 'heater': data = Icons.waves_rounded; break;
-      case 'water_heater': data = Icons.hot_tub_rounded; break;
-      case 'microwave': data = Icons.microwave_rounded; break;
-      case 'coffee_maker': data = Icons.coffee_maker_rounded; break;
-      case 'washing_machine': data = Icons.local_laundry_service_rounded; break;
-      default: data = Icons.device_unknown_rounded;
+      case 'lamp':
+        data = Icons.lightbulb_outline_rounded;
+        break;
+      case 'ac':
+        data = Icons.ac_unit_rounded;
+        break;
+      case 'tv':
+        data = Icons.tv_rounded;
+        break;
+      case 'fan':
+        data = Icons.air_rounded;
+        break;
+      case 'fridge':
+        data = Icons.kitchen_rounded;
+        break;
+      case 'washer':
+        data = Icons.local_laundry_service_rounded;
+        break;
+      case 'pc':
+        data = Icons.computer_rounded;
+        break;
+      case 'router':
+        data = Icons.router_rounded;
+        break;
+      case 'heater':
+        data = Icons.waves_rounded;
+        break;
+      case 'water_heater':
+        data = Icons.hot_tub_rounded;
+        break;
+      case 'microwave':
+        data = Icons.microwave_rounded;
+        break;
+      case 'coffee_maker':
+        data = Icons.coffee_maker_rounded;
+        break;
+      default:
+        data = Icons.device_unknown_rounded;
     }
     return Icon(data, color: isSelected ? Colors.white : Colors.white38, size: 28);
   }

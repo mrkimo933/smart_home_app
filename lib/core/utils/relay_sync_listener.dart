@@ -5,43 +5,45 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/devices_provider.dart';
 import '../../providers/mqtt_provider.dart';
 import '../../services/notification_service.dart';
+import 'electricity_calculator.dart';
+import '../../models/device.dart';
+import '../../models/sensor_data.dart';
 
 final relaySyncListenerProvider = Provider<void>((ref) {
   final notificationService = NotificationService();
+
+  // Track when each device turned on (for high-usage warnings)
   final deviceOnTimers = <int, DateTime>{};
 
+  // ── Feature 1: Relay state → immediate device toggle (zero-power on OFF) ──
   ref.listen<AsyncValue<Map<int, bool>>>(relayStatesProvider, (previous, next) {
     next.whenData((relayMap) {
       final devices = ref.read(devicesProvider);
       final devicesNotifier = ref.read(devicesProvider.notifier);
 
-      for (var entry in relayMap.entries) {
+      for (final entry in relayMap.entries) {
         final relayId = entry.key;
         final isOn = entry.value;
-
         try {
           final device = devices.firstWhere((d) => d.relayId == relayId);
-
           if (device.isOn != isOn) {
-            devicesNotifier.toggleDevice(device.id, isOn);
-            
+            // Immediately update state — no debounce, so power reads 0 at once
+            devicesNotifier.toggleDevice(device.relayId, isOn);
             if (isOn) {
               deviceOnTimers[device.id] = DateTime.now();
             } else {
               deviceOnTimers.remove(device.id);
             }
           }
-        } catch (_) {
-          // Device with relayId not found
-        }
+        } catch (_) {}
       }
     });
   });
 
-  // Watch connection status for power cut detection
+  // ── Connection status: lost-connection notification ────────────────────────
   ref.listen<AsyncValue<bool>>(connectionStatusProvider, (previous, next) {
     next.whenData((isConnected) {
-      if (previous?.value == true && isConnected == false) {
+      if (previous?.value == true && !isConnected) {
         notificationService.showNotification(
           id: 999,
           title: 'Connection Lost',
@@ -51,19 +53,155 @@ final relaySyncListenerProvider = Provider<void>((ref) {
     });
   });
 
-  // Check for long-running devices every 15 minutes
-  Timer.periodic(const Duration(minutes: 15), (_) {
-    final now = DateTime.now();
-    deviceOnTimers.forEach((deviceId, startTime) {
-      final duration = now.difference(startTime);
-      if (duration.inHours >= 3) {
-        final device = ref.read(devicesProvider).firstWhere((d) => d.id == deviceId);
-        notificationService.showNotification(
-          id: deviceId,
-          title: 'High Usage Warning',
-          body: '${device.name} has been running for over 3 hours.',
-        );
-      }
+  // ── Voltage status: Feature 5 ──────────────────────────────────────────────
+  ref.listen<VoltageStatus>(voltageStatusProvider, (previous, next) {
+    // Only act on genuine status transitions
+    if (previous == next) return;
+
+    final voltage = ref.read(sensorDataProvider).value?.voltage ?? 0.0;
+
+    switch (next) {
+      case VoltageStatus.low:
+        notificationService.sendVoltageLowAlert(voltage);
+        break;
+      case VoltageStatus.high:
+        notificationService.sendVoltageHighAlert(voltage);
+        _autoDisconnectNonEssential(ref, notificationService);
+        break;
+      case VoltageStatus.normal:
+        if (previous != null &&
+            previous != VoltageStatus.unknown &&
+            previous != VoltageStatus.normal) {
+          notificationService.sendVoltageNormalAlert(voltage);
+        }
+        break;
+      case VoltageStatus.unknown:
+        break;
+    }
+  });
+
+  // ── Sensor data: overcurrent (Feature 4) + per-device budget (Feature 3) ──
+  ref.listen<AsyncValue<SensorData>>(sensorDataProvider, (previous, next) {
+    next.whenData((data) {
+      final devices = ref.read(devicesProvider);
+      _checkOvercurrent(data, devices, ref, notificationService);
+      _checkDeviceBudgets(devices, ref, notificationService);
     });
   });
+
+  // ── Periodic: device timers (Feature 6) + long-usage warnings ─────────────
+  Timer.periodic(const Duration(minutes: 1), (_) {
+    final now = DateTime.now();
+    final devices = ref.read(devicesProvider);
+    final mqttService = ref.read(mqttServiceProvider);
+
+    for (final device in devices) {
+      if (!device.isOn) continue;
+
+      // Timer check (Feature 6 & 7)
+      if (device.timerMinutes != null && device.timerStartTime != null) {
+        final elapsed = now.difference(device.timerStartTime!).inMinutes;
+        if (elapsed >= device.timerMinutes!) {
+          mqttService.publishRelayCommand(device.relayId, false);
+          final isRunByBudget = device.runBudgetEGP != null;
+          final budget = device.runBudgetEGP;
+          ref.read(devicesProvider.notifier).clearDeviceTimer(device.id);
+          if (isRunByBudget && budget != null) {
+            notificationService.sendRunByBudgetEndAlert(device.name, budget);
+          } else {
+            notificationService.sendTimerEndAlert(device.name);
+          }
+        }
+      }
+
+      // Long-usage warning (existing, fires every 3 hours)
+      final startTime = deviceOnTimers[device.id];
+      if (startTime != null) {
+        final duration = now.difference(startTime);
+        if (duration.inMinutes > 0 && duration.inMinutes % 180 == 0) {
+          notificationService.showNotification(
+            id: device.id,
+            title: 'High Usage Warning',
+            body: '${device.name} has been running for ${duration.inHours}h.',
+          );
+        }
+      }
+    }
+  });
 });
+
+// ── Overcurrent detection ──────────────────────────────────────────────────
+
+void _checkOvercurrent(
+  SensorData data,
+  List<Device> devices,
+  Ref ref,
+  NotificationService notificationService,
+) {
+  for (final device in devices) {
+    if (!device.isOn) continue;
+    final threshold = device.maxCurrentAmps * 1.3;
+    if (data.current > threshold) {
+      notificationService.sendOvercurrentAlert(
+        device.name,
+        data.current,
+        device.maxCurrentAmps,
+      );
+      // Auto-disconnect
+      ref.read(mqttServiceProvider).publishRelayCommand(device.relayId, false);
+      ref.read(devicesProvider.notifier).toggleDevice(device.relayId, false);
+      // Log incident
+      ref.read(databaseServiceProvider).logOvercurrentIncident(
+            deviceId: device.id,
+            deviceName: device.name,
+            current: data.current,
+            maxCurrent: device.maxCurrentAmps,
+          );
+    }
+  }
+}
+
+// ── Per-device budget check ────────────────────────────────────────────────
+
+void _checkDeviceBudgets(
+  List<Device> devices,
+  Ref ref,
+  NotificationService notificationService,
+) {
+  for (final device in devices) {
+    if (!device.isOn) continue;
+    final budget = device.monthlyBudgetEGP;
+    if (budget == null || budget <= 0) continue;
+
+    // Estimate monthly cost from today's usage × 30 days
+    final dailyKwh =
+        device.wattage * (device.totalOnMinutesToday / 60.0) / 1000.0;
+    final monthlyCostEstimate =
+        ElectricityCalculator.calculateCost(dailyKwh) * 30;
+
+    if (monthlyCostEstimate >= budget) {
+      notificationService.sendDeviceBudgetAlert(
+          device.name, monthlyCostEstimate, budget);
+
+      if (device.autoOffOnBudget) {
+        ref.read(mqttServiceProvider).publishRelayCommand(device.relayId, false);
+        ref.read(devicesProvider.notifier).toggleDevice(device.relayId, false);
+        notificationService.sendDeviceAutoOffBudget(device.name);
+      }
+    }
+  }
+}
+
+// ── High-voltage: auto-disconnect non-essential devices ───────────────────
+
+void _autoDisconnectNonEssential(
+    Ref ref, NotificationService notificationService) {
+  final devices = ref.read(devicesProvider);
+  final mqttService = ref.read(mqttServiceProvider);
+  for (final device in devices) {
+    if (device.isOn && device.priority == DevicePriority.nonEssential) {
+      mqttService.publishRelayCommand(device.relayId, false);
+      ref.read(devicesProvider.notifier).toggleDevice(device.relayId, false);
+    }
+  }
+}

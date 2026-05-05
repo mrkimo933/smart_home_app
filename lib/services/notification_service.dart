@@ -1,70 +1,180 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart';
 
 class NotificationService {
-  static final NotificationService _instance = NotificationService._internal(); 
+  static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin(); 
+  final FlutterLocalNotificationsPlugin _plugin =
+      FlutterLocalNotificationsPlugin();
 
   Future<void> init() async {
-    const AndroidInitializationSettings androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings();
-    
-    const InitializationSettings initSettings = InitializationSettings(
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosSettings = DarwinInitializationSettings();
+    const initSettings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
     );
-
-    await _notificationsPlugin.initialize(initSettings);
+    await _plugin.initialize(initSettings);
   }
 
   Future<void> showNotification({
     required int id,
     required String title,
     required String body,
+    bool highPriority = false,
   }) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'energy_alerts',
-      'Energy Alerts',
-      channelDescription: 'Notifications for energy budget and savings',
-      importance: Importance.max,
-      priority: Priority.high,
+    final androidDetails = AndroidNotificationDetails(
+      highPriority ? 'danger_alerts' : 'energy_alerts',
+      highPriority ? 'Danger Alerts' : 'Energy Alerts',
+      channelDescription: 'Smart home energy and safety notifications',
+      importance: highPriority ? Importance.max : Importance.high,
+      priority: highPriority ? Priority.max : Priority.high,
     );
-
-    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails();
-
-    const NotificationDetails platformDetails = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    await _notificationsPlugin.show(id, title, body, platformDetails);
+    const iosDetails = DarwinNotificationDetails();
+    final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+    await _plugin.show(id, title, body, details);
   }
 
-  Future<bool> _canShowNotification(String type) async {
+  // Returns true if the notification type can be shown (10-min cooldown).
+  Future<bool> _canShowWithCooldown(String key,
+      {Duration cooldown = const Duration(minutes: 10)}) async {
     final prefs = await SharedPreferences.getInstance();
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final key = 'notif_${type}_$today';
-    
-    if (prefs.getBool(key) == true) {
-      return false; // Already shown today
+    final lastStr = prefs.getString('notif_ts_$key');
+    if (lastStr != null) {
+      final last = DateTime.tryParse(lastStr);
+      if (last != null && DateTime.now().difference(last) < cooldown) {
+        return false;
+      }
     }
-    
-    await prefs.setBool(key, true);
+    await prefs.setString('notif_ts_$key', DateTime.now().toIso8601String());
     return true;
   }
 
+  // Legacy daily-once smart notification (kept for backward compat)
   Future<void> showSmartNotification({
     required int id,
     required String type,
     required String title,
     required String body,
   }) async {
-    if (await _canShowNotification(type)) {
+    if (await _canShowWithCooldown(type, cooldown: const Duration(hours: 12))) {
       await showNotification(id: id, title: title, body: body);
     }
+  }
+
+  // ─── Budget alerts (house) ─────────────────────────────────────────────────
+
+  Future<void> sendHouseBudgetAlert(int percent, double spent, double budget) async {
+    final key = 'house_budget_$percent';
+    if (!await _canShowWithCooldown(key, cooldown: const Duration(hours: 6))) return;
+
+    late String title;
+    late String body;
+    switch (percent) {
+      case 50:
+        title = 'Budget Notice 💡';
+        body = "You've used half your monthly budget (${spent.toStringAsFixed(0)}/${budget.toStringAsFixed(0)} EGP).";
+        break;
+      case 75:
+        title = 'Budget Warning ⚠️';
+        body = "Warning: 75% of budget used (${spent.toStringAsFixed(0)}/${budget.toStringAsFixed(0)} EGP).";
+        break;
+      case 90:
+        title = 'Budget Critical 🔴';
+        body = "Critical: almost at limit! ${spent.toStringAsFixed(0)}/${budget.toStringAsFixed(0)} EGP used.";
+        break;
+      case 100:
+        title = 'Budget Exceeded ❌';
+        body = "Budget exceeded! ${spent.toStringAsFixed(0)} EGP spent. Consider turning off non-essential devices.";
+        break;
+      default:
+        return;
+    }
+    await showNotification(id: 100 + percent, title: title, body: body);
+  }
+
+  // ─── Per-device budget alerts ──────────────────────────────────────────────
+
+  Future<void> sendDeviceBudgetAlert(String deviceName, double cost, double budget) async {
+    final key = 'device_budget_${deviceName.replaceAll(' ', '_')}';
+    if (!await _canShowWithCooldown(key, cooldown: const Duration(hours: 3))) return;
+    await showNotification(
+      id: 400 + deviceName.hashCode.abs() % 99,
+      title: 'Device Budget Reached',
+      body: '$deviceName has reached its ${budget.toStringAsFixed(0)} EGP budget.',
+    );
+  }
+
+  Future<void> sendDeviceAutoOffBudget(String deviceName) async {
+    await showNotification(
+      id: 450 + deviceName.hashCode.abs() % 49,
+      title: 'Device Turned Off',
+      body: '$deviceName turned off — monthly budget reached.',
+    );
+  }
+
+  // ─── Overcurrent alerts ────────────────────────────────────────────────────
+
+  Future<void> sendOvercurrentAlert(
+      String deviceName, double current, double maxCurrent) async {
+    final key = 'overcurrent_${deviceName.replaceAll(' ', '_')}';
+    if (!await _canShowWithCooldown(key)) return;
+    await showNotification(
+      id: 200 + deviceName.hashCode.abs() % 99,
+      title: '⚠️ DANGER: Overcurrent',
+      body: '⚠️ DANGER: $deviceName drawing abnormal current (${current.toStringAsFixed(1)}A)! Auto-disconnecting for safety.',
+      highPriority: true,
+    );
+  }
+
+  // ─── Voltage alerts ────────────────────────────────────────────────────────
+
+  Future<void> sendVoltageLowAlert(double voltage) async {
+    if (!await _canShowWithCooldown('voltage_low')) return;
+    await showNotification(
+      id: 300,
+      title: '⚠️ Low Voltage Detected',
+      body: '⚠️ Low voltage detected: ${voltage.toStringAsFixed(0)}V — This may damage sensitive devices.',
+    );
+  }
+
+  Future<void> sendVoltageHighAlert(double voltage) async {
+    // High voltage: no cooldown suppression, always alert immediately
+    await showNotification(
+      id: 301,
+      title: '🚨 HIGH VOLTAGE DANGER',
+      body: '🚨 HIGH VOLTAGE DANGER: ${voltage.toStringAsFixed(0)}V detected! Disconnecting sensitive devices for safety.',
+      highPriority: true,
+    );
+  }
+
+  Future<void> sendVoltageNormalAlert(double voltage) async {
+    if (!await _canShowWithCooldown('voltage_normal')) return;
+    await showNotification(
+      id: 302,
+      title: '✅ Voltage Normal',
+      body: '✅ Voltage back to normal: ${voltage.toStringAsFixed(0)}V.',
+    );
+  }
+
+  // ─── Timer alerts ──────────────────────────────────────────────────────────
+
+  Future<void> sendTimerEndAlert(String deviceName) async {
+    await showNotification(
+      id: 500 + deviceName.hashCode.abs() % 99,
+      title: 'Timer Ended ⏰',
+      body: '⏰ $deviceName timer ended — turned off.',
+    );
+  }
+
+  Future<void> sendRunByBudgetEndAlert(String deviceName, double budget) async {
+    await showNotification(
+      id: 600 + deviceName.hashCode.abs() % 99,
+      title: 'Budget Run Ended 💰',
+      body: '💰 $deviceName budget of ${budget.toStringAsFixed(0)} EGP used — turned off.',
+    );
   }
 }

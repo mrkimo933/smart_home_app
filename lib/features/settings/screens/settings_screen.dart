@@ -20,6 +20,8 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _ipController = TextEditingController();
   final _portController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _budgetController = TextEditingController();
   TimeOfDay _autoOffTime = const TimeOfDay(hour: 7, minute: 0);
   
@@ -32,8 +34,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _ipController.text = prefs.getString('mqtt_broker_ip') ?? '192.168.1.100';
-      _portController.text = (prefs.getInt('mqtt_broker_port') ?? 1883).toString();
+      final brokerIp = prefs.getString('mqtt_broker_ip') ?? 'broker.hivemq.com';
+      _ipController.text = brokerIp;
+      
+      final savedPort = prefs.getInt('mqtt_broker_port');
+      if (savedPort != null) {
+        _portController.text = savedPort.toString();
+      } else {
+        _portController.text = '1883';
+      }
+      
+      _usernameController.text = prefs.getString('mqtt_username') ?? '';
+      _passwordController.text = prefs.getString('mqtt_password') ?? '';
       _budgetController.text = (prefs.getDouble('monthly_budget') ?? 500.0).toString();
       final hour = prefs.getInt('auto_off_hour') ?? 7;
       final minute = prefs.getInt('auto_off_minute') ?? 0;
@@ -42,26 +54,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _updateBrokerConfig() async {
-    final ip = _ipController.text.trim();
+    final host = _ipController.text.trim();
     final port = int.tryParse(_portController.text.trim()) ?? 1883;
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
     
-    if (_isValidIp(ip)) {
+    if (host.isNotEmpty) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('mqtt_broker_ip', ip);
+      await prefs.setString('mqtt_broker_ip', host);
       await prefs.setInt('mqtt_broker_port', port);
+      await prefs.setString('mqtt_username', username);
+      await prefs.setString('mqtt_password', password);
       
       // Trigger reconnect
       ref.read(mqttServiceProvider).connect();
       
       _showSnackbar('MQTT Configuration updated', isError: false);
     } else {
-      _showSnackbar('Invalid IP address format', isError: true);
+      _showSnackbar('Broker Host/IP cannot be empty', isError: true);
     }
   }
 
-  bool _isValidIp(String ip) {
-    final regExp = RegExp(r'^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.?\b){4}$');
-    return regExp.hasMatch(ip);
+  @override
+  void dispose() {
+    _ipController.dispose();
+    _portController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _budgetController.dispose();
+    super.dispose();
   }
 
   Future<void> _updateBudget() async {
@@ -115,7 +136,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 TextField(
                   controller: _ipController,
                   decoration: const InputDecoration(
-                    labelText: 'Broker IP Address',
+                    labelText: 'Broker Hostname / IP',
+                    hintText: 'e.g. xxxxx.s1.eu.hivemq.cloud',
                     labelStyle: TextStyle(color: AppColors.textSecondary),
                   ),
                   style: const TextStyle(color: AppColors.textPrimary),
@@ -124,17 +146,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 TextField(
                   controller: _portController,
                   keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Broker Port',
-                    labelStyle: const TextStyle(color: AppColors.textSecondary),
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.save, color: AppColors.primaryBlue),
-                      onPressed: _updateBrokerConfig,
-                    ),
+                    hintText: '8883 for SSL',
+                    labelStyle: TextStyle(color: AppColors.textSecondary),
                   ),
                   style: const TextStyle(color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 12),
+                TextField(
+                  controller: _usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'MQTT Username',
+                    labelStyle: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  style: const TextStyle(color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'MQTT Password',
+                    labelStyle: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  style: const TextStyle(color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _updateBrokerConfig,
+                    icon: const Icon(Icons.save),
+                    label: const Text('Save Connection Settings'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 SettingTile(
                   icon: Icons.wifi,
                   title: 'Broker Status',
@@ -180,8 +232,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 icon: Icons.devices_other_rounded,
                 title: device.name,
                 subtitle: '${device.wattage} W - ${device.priority.toString().split('.').last}',
-                onTap: () => showDialog(
+                onTap: () => showModalBottomSheet(
                   context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
                   builder: (context) => DeviceEditDialog(device: device),
                 ),
               )).toList(),

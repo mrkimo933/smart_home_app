@@ -5,7 +5,7 @@ import '../services/database_service.dart';
 import 'devices_provider.dart';
 import '../services/notification_service.dart';
 
-// Monthly Kwh Provider
+// Monthly kWh Provider
 final monthlyKwhProvider = FutureProvider<double>((ref) async {
   final dbService = ref.watch(databaseServiceProvider);
   return await dbService.getTotalKwhThisMonth();
@@ -17,26 +17,31 @@ final monthlyCostProvider = FutureProvider<double>((ref) async {
   return await dbService.getTotalCostThisMonth();
 });
 
-// Notify when monthly cost exceeds budget
-final budgetAlertProvider = Provider<void>((ref) {
+// Budget alert at 50%, 75%, 90%, 100%
+final houseBudgetAlertProvider = Provider<void>((ref) {
+  final notificationService = NotificationService();
   ref.listen<AsyncValue<double>>(monthlyCostProvider, (prev, next) {
     next.whenData((cost) {
       final budget = ref.read(budgetProvider);
-      if (cost >= budget && budget > 0) {
-        NotificationService().showNotification(
-          id: 100,
-          title: 'Budget Alert',
-          body: 'You have exceeded your monthly budget of EGP ${budget.toStringAsFixed(2)}',
-        );
+      if (budget <= 0) return;
+      final ratio = cost / budget;
+      if (ratio >= 1.0) {
+        notificationService.sendHouseBudgetAlert(100, cost, budget);
+      } else if (ratio >= 0.9) {
+        notificationService.sendHouseBudgetAlert(90, cost, budget);
+      } else if (ratio >= 0.75) {
+        notificationService.sendHouseBudgetAlert(75, cost, budget);
+      } else if (ratio >= 0.5) {
+        notificationService.sendHouseBudgetAlert(50, cost, budget);
       }
     });
   });
-
   return;
 });
 
 // Consumption History Notifier
-class ConsumptionHistoryNotifier extends StateNotifier<AsyncValue<List<ConsumptionRecord>>> {
+class ConsumptionHistoryNotifier
+    extends StateNotifier<AsyncValue<List<ConsumptionRecord>>> {
   final DatabaseService _dbService;
   DateTime _from;
   DateTime _to;
@@ -65,15 +70,15 @@ class ConsumptionHistoryNotifier extends StateNotifier<AsyncValue<List<Consumpti
   }
 }
 
-final consumptionHistoryProvider =
-    StateNotifierProvider<ConsumptionHistoryNotifier, AsyncValue<List<ConsumptionRecord>>>((ref) {
+final consumptionHistoryProvider = StateNotifierProvider<
+    ConsumptionHistoryNotifier, AsyncValue<List<ConsumptionRecord>>>((ref) {
   return ConsumptionHistoryNotifier(ref.watch(databaseServiceProvider));
 });
 
-// Budget Provider using StateNotifier for persistence
+// Legacy budget provider (kept for backward compatibility with energy_saving_screen)
 class BudgetNotifier extends StateNotifier<double> {
-  static const _key = 'energy_budget';
-  
+  static const _key = 'house_budget';
+
   BudgetNotifier() : super(500.0) {
     _loadBudget();
   }

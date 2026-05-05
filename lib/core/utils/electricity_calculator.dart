@@ -94,10 +94,24 @@ class ElectricityCalculator {
   static double getDeviceDailyCost(double wattage, double hoursPerDay) {
     if (wattage <= 0 || hoursPerDay <= 0) return 0.0;
     double dailyKwh = (wattage * hoursPerDay) / 1000;
-    // Note: Cost is calculated based on current tier usually, 
-    // but here we calculate it as if it's the only usage (baseline)
-    // or we could assume a standard rate. 
-    // As per request, we convert and use calculateCost logic.
-    return calculateCost(dailyKwh); 
+    return calculateCost(dailyKwh);
+  }
+
+  /// 8. Calculate how many hours a device can run for a given EGP budget.
+  /// Uses binary search over the tiered pricing structure.
+  static double hoursForBudget(double wattage, double budgetEGP) {
+    if (wattage <= 0 || budgetEGP <= 0) return 0.0;
+    double low = 0.0;
+    double high = 8760.0; // max 1 year of hours
+    while (high - low > 0.001) {
+      final mid = (low + high) / 2;
+      final kwh = wattage * mid / 1000;
+      if (calculateCost(kwh) <= budgetEGP) {
+        low = mid;
+      } else {
+        high = mid;
+      }
+    }
+    return double.parse(low.toStringAsFixed(2));
   }
 }

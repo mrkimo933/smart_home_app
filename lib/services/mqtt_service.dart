@@ -1,6 +1,7 @@
 // lib/services/mqtt_service.dart
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
@@ -47,16 +48,32 @@ class MqttService {
   Future<void> connect() async {
     _isManuallyDisconnected = false;
     final prefs = await SharedPreferences.getInstance();
-    final brokerIp = prefs.getString('mqtt_broker_ip') ?? '192.168.1.100'; 
-    final brokerPort = prefs.getInt('mqtt_broker_port') ?? 1883;
     
-    _client = MqttServerClient(brokerIp, _clientId);
+    // HiveMQ Cloud requires the full hostname (SNI support)
+    final brokerHost = prefs.getString('mqtt_broker_ip') ?? '192.168.1.100'; 
+    final brokerPort = prefs.getInt('mqtt_broker_port') ?? 1883;
+    final username = prefs.getString('mqtt_username') ?? '';
+    final password = prefs.getString('mqtt_password') ?? '';
+    
+    // Use MqttServerClient with the full hostname string for SNI support
+    _client = MqttServerClient(brokerHost, _clientId);
     _client!.port = brokerPort;
     _client!.keepAlivePeriod = 20;
     _client!.onDisconnected = _onDisconnected;
     _client!.onConnected = _onConnected;
     _client!.onSubscribed = _onSubscribed;
-    _client!.logging(on: false);
+    _client!.logging(on: true);
+
+    // Mandatory SSL/TLS for HiveMQ Cloud (Port 8883)
+    if (brokerPort == 8883 || brokerHost.contains('hivemq.cloud')) {
+      _client!.secure = true;
+      _client!.securityContext = SecurityContext.defaultContext;
+      // Handshake Fix: Bypass certificate validation errors
+      _client!.onBadCertificate = (dynamic cert) => true;
+    }
+
+    // Set MQTT Protocol Version to 3.1.1
+    _client!.setProtocolV311();
 
     final connMess = MqttConnectMessage()
         .withClientIdentifier(_clientId)
@@ -65,11 +82,19 @@ class MqttService {
         .startClean()
         .withWillQos(MqttQos.atLeastOnce);
     
+    // Authentication: Ensure username and password are provided
+    if (username.isNotEmpty) {
+      connMess.authenticateAs(username, password);
+    }
+    
     _client!.connectionMessage = connMess;
 
     try {
-      await _client!.connect();
+      // Connect with username and password explicitly if needed by the client implementation
+      await _client!.connect(username, password);
     } catch (e) {
+      // ignore: avoid_print
+      print('MQTT: Connection failed: $e');
       _connectionStatusController.add(false);
       _scheduleReconnect();
     }
@@ -107,7 +132,6 @@ class MqttService {
       _kwh = val ?? 0.0;
       sensorUpdated = true;
     } else if (topic.startsWith('esp/relay/')) {
-      // esp/relay/X/state
       final parts = topic.split('/');
       if (parts.length >= 3) {
         final id = int.tryParse(parts[2]);
@@ -128,7 +152,6 @@ class MqttService {
       );
       _sensorDataController.add(data);
 
-      // Buffer latest and schedule persistence every 5 minutes
       _latestSensorData = data;
       _sensorPersistTimer ??= Timer.periodic(const Duration(minutes: 5), (_) async {
         if (_latestSensorData != null) {
@@ -146,12 +169,10 @@ class MqttService {
 
   void _subscribeToTopics() {
     if (_client?.connectionStatus?.state == MqttConnectionState.connected) {
-      // Subscribe to sensors
       for (var topic in MqttTopics.sensorTopics) {
         _client!.subscribe(topic, MqttQos.atMostOnce);
       }
       
-      // Subscribe to relays
       for (var topic in MqttTopics.relayStateTopics) {
         _client!.subscribe(topic, MqttQos.atMostOnce);
       }
