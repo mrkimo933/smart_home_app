@@ -80,11 +80,17 @@ final relaySyncListenerProvider = Provider<void>((ref) {
     }
   });
 
-  // ── Sensor data: overcurrent (Feature 4) + per-device budget (Feature 3) ──
+  // ── Sensor data: Smart Protection Engine + per-device budget ──────────────
   ref.listen<AsyncValue<SensorData>>(sensorDataProvider, (previous, next) {
     next.whenData((data) {
       final devices = ref.read(devicesProvider);
-      _checkOvercurrent(data, devices, ref, notificationService);
+      // Fire-and-forget: engine is internally guarded against re-entry.
+      _protectionEngine.evaluate(
+        data: data,
+        devices: devices,
+        ref: ref,
+        notificationService: notificationService,
+      );
       _checkDeviceBudgets(devices, ref, notificationService);
     });
   });
@@ -133,43 +139,217 @@ final relaySyncListenerProvider = Provider<void>((ref) {
   ref.onDispose(() => periodicTimer?.cancel());
 });
 
-// ── House breaker limit (configurable) ────────────────────────────────────
+// ── Protection constants ───────────────────────────────────────────────────
+
+/// House breaker limit in Amps. Overload is detected above this.
 const double kHouseBreakerAmps = 30.0;
 
-// ── Overcurrent detection ──────────────────────────────────────────────────
+/// Any reading above this is a hard short-circuit / catastrophic fault.
+/// At 220V, 50A = 11 kW — far beyond any residential load.
+const double kShortCircuitThreshold = 50.0;
 
-void _checkOvercurrent(
-  SensorData data,
-  List<Device> devices,
-  Ref ref,
-  NotificationService notificationService,
-) {
-  const threshold = kHouseBreakerAmps * 1.1; // 10% tolerance
-  if (data.current > threshold) {
-    final onDevices = devices.where((d) => d.isOn).toList()
-      ..sort((a, b) => b.wattage.compareTo(a.wattage));
+/// Tolerance before triggering overload (10% headroom for motor start surges).
+const double kOverloadTolerance = 1.10;
 
-    final targetDevice = onDevices.isNotEmpty ? onDevices.first : null;
+/// How long to ignore repeated trips on the same device (anti-spam).
+const Duration kPerDeviceCooldown = Duration(seconds: 30);
 
-    notificationService.sendOvercurrentAlert(
-      targetDevice?.name ?? 'House',
-      data.current,
-      kHouseBreakerAmps,
-    );
+/// Full blackout cooldown after a short-circuit event — don't re-arm for 60s.
+const Duration kShortCircuitCooldown = Duration(seconds: 60);
 
-    if (targetDevice != null) {
-      ref.read(httpEspServiceProvider).publishRelayCommand(targetDevice.relayId, false);
-      ref.read(devicesProvider.notifier).toggleDevice(targetDevice.relayId, false);
+// ── Smart Protection Engine ────────────────────────────────────────────────
+// A stateful singleton that lives for the lifetime of the provider.
+// Tracks per-device trip timestamps + a global short-circuit lock.
+
+class _SmartProtectionEngine {
+  /// Last trip timestamp per device ID.
+  final Map<int, DateTime> _deviceTripTimes = {};
+
+  /// When the last short-circuit ALL-OFF was triggered.
+  DateTime? _lastShortCircuitAt;
+
+  /// Prevent re-entrant calls while we are still sending HTTP requests.
+  bool _handling = false;
+
+  // ── Public entry point ───────────────────────────────────────────────────
+
+  Future<void> evaluate({
+    required SensorData data,
+    required List<Device> devices,
+    required Ref ref,
+    required NotificationService notificationService,
+  }) async {
+    if (_handling) return; // already processing — skip this poll tick
+
+    final current = data.current;
+    final activeDevices = devices.where((d) => d.isOn).toList();
+
+    // ── Tier 1: Short-circuit (catastrophic spike) ─────────────────────────
+    if (current >= kShortCircuitThreshold) {
+      await _handleShortCircuit(
+        current: current,
+        activeDevices: activeDevices,
+        ref: ref,
+        notificationService: notificationService,
+      );
+      return;
     }
 
-    ref.read(databaseServiceProvider).logOvercurrentIncident(
-          deviceId: targetDevice?.id ?? 0,
-          deviceName: targetDevice?.name ?? 'House',
-          current: data.current,
-          maxCurrent: kHouseBreakerAmps,
-        );
+    // ── Tier 2: Overload (exceeds sum of active device ratings or breaker) ─
+    final expectedMax = _expectedMaxCurrent(activeDevices);
+    const breakerLimit = kHouseBreakerAmps * kOverloadTolerance;
+    if (current > breakerLimit || current > expectedMax * kOverloadTolerance) {
+      await _handleOverload(
+        current: current,
+        expectedMax: expectedMax.clamp(0, kHouseBreakerAmps),
+        activeDevices: activeDevices,
+        ref: ref,
+        notificationService: notificationService,
+      );
+    }
+  }
+
+  // ── Tier 1 handler: Short Circuit ────────────────────────────────────────
+
+  Future<void> _handleShortCircuit({
+    required double current,
+    required List<Device> activeDevices,
+    required Ref ref,
+    required NotificationService notificationService,
+  }) async {
+    final now = DateTime.now();
+
+    // Cooldown guard — do not re-trigger within 60 s of last short-circuit.
+    if (_lastShortCircuitAt != null &&
+        now.difference(_lastShortCircuitAt!) < kShortCircuitCooldown) {
+      return;
+    }
+
+    _handling = true;
+    _lastShortCircuitAt = now;
+
+    // Identify the most likely culprit:
+    // The device with the highest rated current that is currently ON.
+    // Rationale: a short circuit usually involves the load just switched on,
+    // which tends to be the heaviest one.
+    activeDevices.sort((a, b) => b.maxCurrentAmps.compareTo(a.maxCurrentAmps));
+    final culprit = activeDevices.isNotEmpty ? activeDevices.first : null;
+
+    final espService = ref.read(httpEspServiceProvider);
+    final devicesNotifier = ref.read(devicesProvider.notifier);
+
+    // Kill ALL active relays immediately for safety.
+    for (final device in activeDevices) {
+      espService.publishRelayCommand(device.relayId, false);
+      devicesNotifier.toggleDevice(device.relayId, false);
+      _deviceTripTimes[device.id] = now;
+    }
+
+    // Fire high-priority notification.
+    await notificationService.sendShortCircuitAlert(
+      culpritName: culprit?.name ?? 'Unknown Device',
+      detectedAmps: current,
+      affectedCount: activeDevices.length,
+    );
+
+    // Log every tripped device to the incident DB.
+    final db = ref.read(databaseServiceProvider);
+    for (final device in activeDevices) {
+      await db.logOvercurrentIncident(
+        deviceId: device.id,
+        deviceName: device.name,
+        current: current,
+        maxCurrent: kShortCircuitThreshold,
+      );
+    }
+
+    _handling = false;
+  }
+
+  // ── Tier 2 handler: Overload ──────────────────────────────────────────────
+
+  Future<void> _handleOverload({
+    required double current,
+    required double expectedMax,
+    required List<Device> activeDevices,
+    required Ref ref,
+    required NotificationService notificationService,
+  }) async {
+    final now = DateTime.now();
+
+    // Sort by priority (shed nonEssential first) then by wattage (highest first).
+    final shedOrder = List<Device>.from(activeDevices)
+      ..sort((a, b) {
+        final pa = _priorityWeight(a.priority);
+        final pb = _priorityWeight(b.priority);
+        if (pa != pb) return pb.compareTo(pa); // higher weight = shed first
+        return b.wattage.compareTo(a.wattage);
+      });
+
+    final espService = ref.read(httpEspServiceProvider);
+    final devicesNotifier = ref.read(devicesProvider.notifier);
+    final db = ref.read(databaseServiceProvider);
+
+    double runningCurrent = current;
+
+    // Shed devices one by one until we are back under the breaker limit.
+    for (final device in shedOrder) {
+      if (runningCurrent <= kHouseBreakerAmps) break;
+
+      // Skip devices that tripped recently (per-device cooldown).
+      final lastTrip = _deviceTripTimes[device.id];
+      if (lastTrip != null && now.difference(lastTrip) < kPerDeviceCooldown) {
+        continue;
+      }
+
+      _handling = true;
+      _deviceTripTimes[device.id] = now;
+
+      espService.publishRelayCommand(device.relayId, false);
+      devicesNotifier.toggleDevice(device.relayId, false);
+
+      await notificationService.sendOverloadAlert(
+        deviceName: device.name,
+        detectedAmps: current,
+        maxAmps: expectedMax,
+        deviceMaxAmps: device.maxCurrentAmps,
+      );
+
+      await db.logOvercurrentIncident(
+        deviceId: device.id,
+        deviceName: device.name,
+        current: current,
+        maxCurrent: expectedMax,
+      );
+
+      // Approximate how much current this device contributed.
+      runningCurrent -= (device.wattage / 220.0);
+      _handling = false;
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  /// Sum of maxCurrentAmps for all currently active devices.
+  double _expectedMaxCurrent(List<Device> activeDevices) {
+    return activeDevices.fold(0.0, (sum, d) => sum + d.maxCurrentAmps);
+  }
+
+  /// Higher weight = shed this device first during overload.
+  int _priorityWeight(DevicePriority priority) {
+    switch (priority) {
+      case DevicePriority.nonEssential:
+        return 3;
+      case DevicePriority.normal:
+        return 2;
+      case DevicePriority.essential:
+        return 1; // shed last
+    }
   }
 }
+
+// Global engine instance — lives for the Provider lifetime.
+final _protectionEngine = _SmartProtectionEngine();
 
 // ── Per-device budget check ────────────────────────────────────────────────
 

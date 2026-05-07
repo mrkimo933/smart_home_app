@@ -118,6 +118,7 @@ class NotificationService {
 
   // ─── Overcurrent alerts ────────────────────────────────────────────────────
 
+  /// Legacy single-device overcurrent — kept for backward compatibility.
   Future<void> sendOvercurrentAlert(
       String deviceName, double current, double maxCurrent) async {
     final key = 'overcurrent_${deviceName.replaceAll(' ', '_')}';
@@ -125,7 +126,52 @@ class NotificationService {
     await showNotification(
       id: 200 + deviceName.hashCode.abs() % 99,
       title: '⚠️ DANGER: Overcurrent',
-      body: '⚠️ DANGER: $deviceName drawing abnormal current (${current.toStringAsFixed(1)}A)! Auto-disconnecting for safety.',
+      body: '⚠️ DANGER: $deviceName drawing abnormal current '
+          '(${current.toStringAsFixed(1)}A)! Auto-disconnecting for safety.',
+      highPriority: true,
+    );
+  }
+
+  /// Tier-1: Catastrophic short-circuit — all active relays were killed.
+  /// Short cooldown (30 s) so the user is always informed of a hard fault.
+  Future<void> sendShortCircuitAlert({
+    required String culpritName,
+    required double detectedAmps,
+    required int affectedCount,
+  }) async {
+    const key = 'short_circuit';
+    if (!await _canShowWithCooldown(key, cooldown: const Duration(seconds: 30))) {
+      return;
+    }
+    await showNotification(
+      id: 210,
+      title: '🚨 Short Circuit Detected!',
+      body: '⚠️ Danger Averted! "$culpritName" and $affectedCount device(s) '
+          'were automatically disconnected due to a severe Short Circuit '
+          '(${detectedAmps.toStringAsFixed(1)}A detected — limit: 50A). '
+          'Check your wiring before reconnecting.',
+      highPriority: true,
+    );
+  }
+
+  /// Tier-2: Overload — a single device was shed to reduce total load.
+  Future<void> sendOverloadAlert({
+    required String deviceName,
+    required double detectedAmps,
+    required double maxAmps,
+    required double deviceMaxAmps,
+  }) async {
+    final key = 'overload_${deviceName.replaceAll(' ', '_')}';
+    if (!await _canShowWithCooldown(key, cooldown: const Duration(seconds: 30))) {
+      return;
+    }
+    await showNotification(
+      id: 220 + deviceName.hashCode.abs() % 79,
+      title: '⚠️ Overload — Device Disconnected',
+      body: '"$deviceName" was automatically turned off to prevent an overload '
+          '(house drawing ${detectedAmps.toStringAsFixed(1)}A, '
+          'limit ${maxAmps.toStringAsFixed(1)}A). '
+          'Device rated max: ${deviceMaxAmps.toStringAsFixed(1)}A.',
       highPriority: true,
     );
   }
