@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../models/device.dart';
 import '../../../providers/esp_provider.dart';
 import '../../../providers/devices_provider.dart';
+import '../../../providers/system_provider.dart';
 import '../../../core/utils/electricity_calculator.dart';
 import 'device_edit_dialog.dart';
 
@@ -497,28 +498,102 @@ class DeviceCard extends ConsumerWidget {
                       ),
                       Tooltip(
                         message: isMqttConnected ? '' : 'اتصل بالـ ESP أولاً',
-                        child: GestureDetector(
-                          onTap: isMqttConnected
-                              ? () {
-                                  ref
-                                      .read(httpEspServiceProvider)
-                                      .publishRelayCommand(device.relayId, !active);
-                                  ref
-                                      .read(devicesProvider.notifier)
-                                      .toggleDevice(device.relayId, !active);
-                                }
-                              : null,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            width: 52,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
-                              color: active
-                                  ? const Color(0xFF00B4D8)
-                                  : (isMqttConnected
-                                      ? Colors.grey.shade800
-                                      : Colors.grey.shade900),
+                        child: Builder(builder: (context) {
+                          final protectedRelays =
+                              ref.watch(protectedRelaysProvider);
+                          final isProtected =
+                              protectedRelays.contains(device.relayId);
+
+                          return GestureDetector( // ignore: avoid_returning_widgets
+                            onTap: isMqttConnected
+                                ? () async {
+                                    final turningOn = !active;
+
+                                    // Block re-enable if relay is protection-locked.
+                                    if (turningOn && isProtected) {
+                                      final confirmed =
+                                          await showDialog<bool>(
+                                        context: context,
+                                        builder: (_) => AlertDialog(
+                                          backgroundColor:
+                                              const Color(0xFF1D1E33),
+                                          title: const Row(children: [
+                                            Text('⚠️ ',
+                                                style: TextStyle(
+                                                    fontSize: 20)),
+                                            Text('تحذير: دائرة قصيرة',
+                                                style: TextStyle(
+                                                    color: Colors.red,
+                                                    fontWeight:
+                                                        FontWeight.bold)),
+                                          ]),
+                                          content: Text(
+                                            'تم اكتشاف دائرة قصيرة في "${device.name}" وتم قطعه تلقائياً للحماية.\n\n'
+                                            'هل أنت متأكد أن المشكلة اتصلحت وتريد إعادة التشغيل؟',
+                                            style: const TextStyle(
+                                                color: Colors.white70),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(
+                                                      context, false),
+                                              child: const Text('إلغاء',
+                                                  style: TextStyle(
+                                                      color: Colors
+                                                          .white54)),
+                                            ),
+                                            ElevatedButton(
+                                              style:
+                                                  ElevatedButton.styleFrom(
+                                                      backgroundColor:
+                                                          Colors.red),
+                                              onPressed: () =>
+                                                  Navigator.pop(
+                                                      context, true),
+                                              child: const Text(
+                                                  'إلغاء الحماية وتشغيل',
+                                                  style: TextStyle(
+                                                      color: Colors.white)),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      if (confirmed != true) return;
+
+                                      // User confirmed — remove the lock.
+                                      final current =
+                                          ref.read(protectedRelaysProvider);
+                                      ref
+                                          .read(protectedRelaysProvider
+                                              .notifier)
+                                          .state = Set.from(current)
+                                        ..remove(device.relayId);
+                                    }
+
+                                    ref
+                                        .read(httpEspServiceProvider)
+                                        .publishRelayCommand(
+                                            device.relayId, turningOn);
+                                    ref
+                                        .read(devicesProvider.notifier)
+                                        .toggleDevice(
+                                            device.relayId, turningOn);
+                                  }
+                                : null,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              width: 52,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                color: isProtected && !active
+                                    ? Colors.red.shade900
+                                    : active
+                                        ? const Color(0xFF00B4D8)
+                                        : (isMqttConnected
+                                            ? Colors.grey.shade800
+                                            : Colors.grey.shade900),
                               boxShadow: active
                                   ? [
                                       BoxShadow(
@@ -552,8 +627,9 @@ class DeviceCard extends ConsumerWidget {
                               ),
                             ),
                           ),
-                        ),
-                      ),
+                        );   // GestureDetector
+                      }),    // Builder
+                    ),       // Tooltip
                     ],
                   ),
                 ],

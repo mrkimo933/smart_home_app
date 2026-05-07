@@ -116,3 +116,8 @@ final systemProvider = Provider<void>((ref) {
 });
 
 final activeScenarioProvider = StateProvider<EnergyScenario?>((ref) => null);
+
+/// Relay IDs (1-based) that were tripped by the short-circuit protection.
+/// A device in this set cannot be turned ON until the user explicitly
+/// acknowledges the warning and clears the lock.
+final protectedRelaysProvider = StateProvider<Set<int>>((ref) => {});

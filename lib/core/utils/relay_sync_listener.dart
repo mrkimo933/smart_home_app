@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/devices_provider.dart';
 import '../../providers/esp_provider.dart';
+import '../../providers/system_provider.dart';
 import '../../services/notification_service.dart';
 import 'electricity_calculator.dart';
 import '../../models/device.dart';
@@ -239,10 +240,21 @@ class _SmartProtectionEngine {
     final devicesNotifier = ref.read(devicesProvider.notifier);
 
     // Kill ALL active relays immediately for safety.
+    final trippedRelayIds = <int>{};
     for (final device in activeDevices) {
       espService.publishRelayCommand(device.relayId, false);
       devicesNotifier.toggleDevice(device.relayId, false);
       _deviceTripTimes[device.id] = now;
+      trippedRelayIds.add(device.relayId);
+    }
+
+    // Lock every tripped relay so the user must confirm before re-enabling.
+    if (trippedRelayIds.isNotEmpty) {
+      final current = ref.read(protectedRelaysProvider);
+      ref.read(protectedRelaysProvider.notifier).state = {
+        ...current,
+        ...trippedRelayIds,
+      };
     }
 
     // Fire high-priority notification.
