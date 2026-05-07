@@ -9,6 +9,7 @@ import '../../../providers/esp_provider.dart';
 import '../../../models/device.dart';
 import '../widgets/device_card.dart';
 import '../widgets/device_edit_dialog.dart';
+import '../../notifications/widgets/notification_bell.dart';
 
 class DevicesScreen extends ConsumerWidget {
   const DevicesScreen({super.key});
@@ -29,6 +30,7 @@ class DevicesScreen extends ConsumerWidget {
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: Colors.white),
         ),
         actions: [
+          const NotificationBell(),
           Container(
             margin: const EdgeInsets.only(right: 12),
             decoration: BoxDecoration(

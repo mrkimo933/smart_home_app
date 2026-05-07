@@ -15,6 +15,7 @@ import '../widgets/sensor_card.dart';
 import '../widgets/bill_prediction_card.dart';
 import '../widgets/peak_hours_banner.dart';
 import '../widgets/quick_actions_bar.dart';
+import '../../notifications/widgets/notification_bell.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -33,6 +34,7 @@ class DashboardScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(AppStrings.getString(language, 'dashboard')),
         actions: [
+          const NotificationBell(),
           if (isSimulating)
             Container(
               margin: const EdgeInsets.only(right: 8),

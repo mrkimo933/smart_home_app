@@ -16,6 +16,7 @@ import '../../../services/database_service.dart';
 import '../../../services/notification_service.dart';
 import '../widgets/active_plan_tracker.dart';
 import '../widgets/device_priority_card.dart';
+import '../../notifications/widgets/notification_bell.dart';
 
 final energySavingModeProvider = StateProvider<bool>((ref) => false);
 
@@ -787,6 +788,9 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
             style: TextStyle(color: AppColors.textPrimary)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: const [
+          NotificationBell(),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),

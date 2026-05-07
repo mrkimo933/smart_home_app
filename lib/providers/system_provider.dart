@@ -11,6 +11,7 @@ import '../services/notification_service.dart';
 import '../features/energy_saving/screens/energy_saving_screen.dart';
 import '../models/device.dart';
 import '../models/energy_scenario.dart';
+import '../models/app_notification.dart';
 
 // Provider to handle daily reset and other system-level tasks
 final systemProvider = Provider<void>((ref) {
@@ -121,3 +122,33 @@ final activeScenarioProvider = StateProvider<EnergyScenario?>((ref) => null);
 /// A device in this set cannot be turned ON until the user explicitly
 /// acknowledges the warning and clears the lock.
 final protectedRelaysProvider = StateProvider<Set<int>>((ref) => {});
+
+class NotificationsNotifier extends StateNotifier<List<AppNotification>> {
+  NotificationsNotifier() : super([]);
+
+  void add(AppNotification notification) {
+    state = [notification, ...state].take(50).toList();
+  }
+
+  void markAllRead() {
+    state = state.map((n) => n..isRead = true).toList();
+  }
+
+  void markRead(int id) {
+    state = state.map((n) {
+      if (n.id == id) n.isRead = true;
+      return n;
+    }).toList();
+  }
+
+  void clear() => state = [];
+}
+
+final notificationsProvider =
+    StateNotifierProvider<NotificationsNotifier, List<AppNotification>>(
+  (ref) => NotificationsNotifier(),
+);
+
+final unreadCountProvider = Provider<int>((ref) {
+  return ref.watch(notificationsProvider).where((n) => !n.isRead).length;
+});

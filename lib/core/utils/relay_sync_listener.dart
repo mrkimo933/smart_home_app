@@ -6,6 +6,7 @@ import '../../providers/devices_provider.dart';
 import '../../providers/esp_provider.dart';
 import '../../providers/system_provider.dart';
 import '../../services/notification_service.dart';
+import '../../models/app_notification.dart';
 import 'electricity_calculator.dart';
 import '../../models/device.dart';
 import '../../models/sensor_data.dart';
@@ -64,9 +65,23 @@ final relaySyncListenerProvider = Provider<void>((ref) {
     switch (next) {
       case VoltageStatus.low:
         notificationService.sendVoltageLowAlert(voltage);
+        ref.read(notificationsProvider.notifier).add(AppNotification(
+          id: DateTime.now().millisecondsSinceEpoch,
+          title: '⚠️ Low Voltage Detected',
+          body: '⚠️ Low voltage detected: ${voltage.toStringAsFixed(0)}V — This may damage sensitive devices.',
+          type: NotificationType.voltageWarning,
+          timestamp: DateTime.now(),
+        ));
         break;
       case VoltageStatus.high:
         notificationService.sendVoltageHighAlert(voltage);
+        ref.read(notificationsProvider.notifier).add(AppNotification(
+          id: DateTime.now().millisecondsSinceEpoch,
+          title: '🚨 HIGH VOLTAGE DANGER',
+          body: '🚨 HIGH VOLTAGE DANGER: ${voltage.toStringAsFixed(0)}V detected! Disconnecting sensitive devices for safety.',
+          type: NotificationType.voltageWarning,
+          timestamp: DateTime.now(),
+        ));
         _autoDisconnectNonEssential(ref, notificationService);
         break;
       case VoltageStatus.normal:
@@ -117,8 +132,24 @@ final relaySyncListenerProvider = Provider<void>((ref) {
           ref.read(devicesProvider.notifier).clearDeviceTimer(device.id);
           if (isRunByBudget && budget != null) {
             notificationService.sendRunByBudgetEndAlert(device.name, budget);
+            ref.read(notificationsProvider.notifier).add(AppNotification(
+              id: DateTime.now().millisecondsSinceEpoch,
+              title: 'Budget Run Ended 💰',
+              body: '💰 ${device.name} budget of ${budget.toStringAsFixed(0)} EGP used — turned off.',
+              type: NotificationType.scheduleExecuted,
+              deviceName: device.name,
+              timestamp: DateTime.now(),
+            ));
           } else {
             notificationService.sendTimerEndAlert(device.name);
+            ref.read(notificationsProvider.notifier).add(AppNotification(
+              id: DateTime.now().millisecondsSinceEpoch,
+              title: 'Timer Ended ⏰',
+              body: '⏰ ${device.name} timer ended — turned off.',
+              type: NotificationType.scheduleExecuted,
+              deviceName: device.name,
+              timestamp: DateTime.now(),
+            ));
           }
         }
       }
@@ -263,6 +294,16 @@ class _SmartProtectionEngine {
       detectedAmps: current,
       affectedCount: activeDevices.length,
     );
+    ref.read(notificationsProvider.notifier).add(AppNotification(
+      id: DateTime.now().millisecondsSinceEpoch,
+      title: '🚨 Short Circuit Detected!',
+      body: '⚠️ Danger Averted! "${culprit?.name ?? 'Unknown Device'}" and ${activeDevices.length} device(s) '
+          'were automatically disconnected due to a severe Short Circuit '
+          '(${current.toStringAsFixed(1)}A detected — limit: 50A).',
+      type: NotificationType.shortCircuit,
+      deviceName: culprit?.name,
+      timestamp: DateTime.now(),
+    ));
 
     // Log every tripped device to the incident DB.
     final db = ref.read(databaseServiceProvider);
@@ -326,6 +367,16 @@ class _SmartProtectionEngine {
         maxAmps: expectedMax,
         deviceMaxAmps: device.maxCurrentAmps,
       );
+      ref.read(notificationsProvider.notifier).add(AppNotification(
+        id: DateTime.now().millisecondsSinceEpoch,
+        title: '⚠️ Overload — Device Disconnected',
+        body: '"${device.name}" was automatically turned off to prevent an overload '
+            '(house drawing ${current.toStringAsFixed(1)}A, '
+            'limit ${expectedMax.toStringAsFixed(1)}A).',
+        type: NotificationType.overcurrent,
+        deviceName: device.name,
+        timestamp: DateTime.now(),
+      ));
 
       await db.logOvercurrentIncident(
         deviceId: device.id,
@@ -383,6 +434,14 @@ void _checkDeviceBudgets(
     if (monthlyCostEstimate >= budget) {
       notificationService.sendDeviceBudgetAlert(
           device.name, monthlyCostEstimate, budget);
+      ref.read(notificationsProvider.notifier).add(AppNotification(
+        id: DateTime.now().millisecondsSinceEpoch,
+        title: 'Device Budget Reached 💰',
+        body: '${device.name} has reached its ${budget.toStringAsFixed(0)} EGP monthly budget.',
+        type: NotificationType.budgetAlert,
+        deviceName: device.name,
+        timestamp: DateTime.now(),
+      ));
 
       if (device.autoOffOnBudget) {
         ref.read(httpEspServiceProvider).publishRelayCommand(device.relayId, false);

@@ -46,27 +46,33 @@ class AiScenarioService {
   String _getDeviceNature(String deviceName) {
     final name = deviceName.toLowerCase();
     if (name.contains('fridge') || name.contains('refrigerator') || name.contains('ثلاجة')) {
-      return 'Must run 24h/day, cannot be turned off';
+      return 'تشتغل 24 ساعة دايماً - ما تتوقفش أبداً - hoursPerDay يكون 24';
     }
-    if (name.contains('ac') || name.contains('air') || name.contains('تكييف')) {
-      return 'Cooling device, best used at night (10pm-6am) to save cost';
+    if (name.contains('ac') || name.contains('air') || name.contains('condition') || name.contains('تكييف')) {
+      return 'تكييف - يحتاج 6-10 ساعات يومياً في الصيف المصري - مش ساعة واحدة - أكفأ وقت الليل';
     }
-    if (name.contains('heater') || name.contains('سخان')) {
-      return 'Use max 1-2 hours/day, prefer morning';
+    if (name.contains('heater') || name.contains('سخان') || name.contains('water heater')) {
+      return 'سخان مياه - يكفيه 45 دقيقة (0.75 ساعة) يومياً قبل الاستحمام - مش ساعتين';
     }
     if (name.contains('wash') || name.contains('غسالة')) {
-      return 'Use every 2-3 days, 1 hour per use, prefer off-peak';
+      return 'غسالة - 3-4 مرات أسبوعياً، كل مرة 1.5 ساعة، معدل يومي = 0.64 ساعة';
     }
-    if (name.contains('tv') || name.contains('تلفزيون')) {
-      return 'Evening use 6pm-11pm, ~4 hours/day';
+    if (name.contains('tv') || name.contains('تلفزيون') || name.contains('شاشة')) {
+      return 'تلفزيون - 3-5 ساعات يومياً مساءً';
     }
-    if (name.contains('lamp') || name.contains('light') || name.contains('نور') || name.contains('إضاءة')) {
-      return 'Evening lighting, 6-8 hours/day';
+    if (name.contains('lamp') || name.contains('light') || name.contains('نور') || name.contains('إضاءة') || name.contains('لمبة')) {
+      return 'إضاءة - 5-8 ساعات يومياً من 6م لحد 12م';
     }
-    if (name.contains('computer') || name.contains('laptop') || name.contains('كمبيوتر')) {
-      return 'Work/study device, 4-8 hours/day';
+    if (name.contains('computer') || name.contains('laptop') || name.contains('كمبيوتر') || name.contains('لابتوب')) {
+      return 'كمبيوتر أو لابتوب - 4-8 ساعات يومياً';
     }
-    return 'General device, estimate based on $deviceName wattage and typical usage';
+    if (name.contains('microwave') || name.contains('ميكرويف')) {
+      return 'ميكرويف - استخدام قصير 15-20 دقيقة يومياً';
+    }
+    if (name.contains('iron') || name.contains('مكواة')) {
+      return 'مكواة - مرة أو مرتين أسبوعياً، 30-45 دقيقة';
+    }
+    return 'جهاز عام - قدّر ساعات الاستخدام بناءً على الواتية المذكورة';
   }
 
   Future<List<EnergyScenario>> generateScenarios({
@@ -83,76 +89,71 @@ class AiScenarioService {
 
     final deviceContext = devices.map((d) {
       final nature = _getDeviceNature(d.name);
-      return '- ${d.name}: ${d.wattage}W | طبيعة الجهاز: $nature';
+      return '- ${d.name} | ${d.wattage}W | أولوية: ${d.priority.name} | طبيعة: $nature';
     }).join('\n');
 
     final userContent = '''
-أنت مستشار طاقة ذكي متخصص في المنازل المصرية.
+أنت مستشار طاقة خبير للمنازل المصرية. فكّر كأنك إنسان بيخطط ميزانية كهرباء شهرية لأسرة مصرية.
 
-ميزانية المستخدم الشهرية: $budgetEGP جنيه
-اليوم الحالي من الشهر: $currentDay
-الاستهلاك الحالي هذا الشهر: ${currentKwh.toStringAsFixed(2)} كيلوواط/ساعة
-التكلفة الحالية: ${currentCostEGP.toStringAsFixed(2)} جنيه
+معلومات المستخدم:
+- الميزانية الشهرية: $budgetEGP جنيه
+- اليوم الحالي من الشهر: $currentDay
+- الاستهلاك الحالي هذا الشهر: ${currentKwh.toStringAsFixed(2)} كيلوواط/ساعة
+- التكلفة المصروفة حتى الآن: ${currentCostEGP.toStringAsFixed(2)} جنيه
 
-الأجهزة المتاحة:
+الأجهزة الموجودة في البيت:
 $deviceContext
 
-تعليمات مهمة جداً:
-1. افهم طبيعة كل جهاز (الثلاجة تشتغل 24 ساعة، التكييف أفضل ليلاً، السخان ساعة يومياً)
-2. الميزانية ($budgetEGP جنيه) هي الحد الأقصى للصرف - اعمل خططاً تستغل الميزانية بشكل ذكي
-3. اعمل 3 خطط:
-   - توفير أقصى: استخدام الضروريات فقط (50-70% من الميزانية)
-   - توازن: راحة معقولة (75-90% من الميزانية)
-   - راحة: استخدام مريح (90-100% من الميزانية)
-4. احسب التكلفة باستخدام شرائح الكهرباء المصرية:
-   0-50 كيلوواط = 0.41 جنيه/كيلوواط
-   51-100 = 0.71 جنيه/كيلوواط
-   101-200 = 1.01 جنيه/كيلوواط
-   201-350 = 1.61 جنيه/كيلوواط
-   351-650 = 1.85 جنيه/كيلوواط
-   651-1000 = 2.15 جنيه/كيلوواط
-   أكثر من 1000 = 2.35 جنيه/كيلوواط
-5. لكل جهاز: حدد ساعات تشغيل يومية منطقية وأفضل وقت تشغيل
-6. النصائح يجب أن تكون عملية ومحددة
+مهمتك: اعمل 3 خطط تشغيل مختلفة.
 
-أجب فقط بـ JSON array بالتنسيق التالي بالضبط، بدون أي نص إضافي أو markdown:
+⚠️ قاعدة أساسية لا تنكسر: كل خطة لازم تكلف بين 90% و100% من الميزانية ($budgetEGP جنيه).
+الفرق بين الخطط هو أسلوب التشغيل (إمتى وإزاي) — مش السعر.
+
+الخطة 1 - "جدول الليل" 🌙
+  شغّل الأجهزة الثقيلة بالليل (تكييف من 10م لـ6ص، غسالة 11م، سخان 5:30ص).
+  استغل الجو البارد بالليل لتشغيل أكفأ.
+
+الخطة 2 - "جدول الصبح" ☀️
+  خلّص الأعمال الثقيلة الصبح بدري (تكييف من 6ص لـ2م، غسالة 9ص، سخان 6ص).
+  ارتاح بالليل.
+
+الخطة 3 - "جدول حر" 🕐
+  استخدم الأجهزة وقت ما تحب، بس احسب أقصى ساعات ممكنة لكل جهاز عشان ميتعداش الميزانية.
+
+قواعد الحساب:
+1. الثلاجة دايماً 24 ساعة في اليوم — لا تتغير أبداً
+2. التكييف في الصيف المصري يحتاج 6-10 ساعات يومياً — مش ساعة
+3. السخان يكفيه 45 دقيقة (0.75 ساعة) يومياً — مش ساعتين
+4. الغسالة 3-4 مرات أسبوعياً × 1.5 ساعة = معدل 0.64 ساعة يومياً
+5. لو التكلفة الحسابية أقل من 90% من الميزانية، زيد ساعات الأجهزة غير الأساسية لحد ما تكمل
+6. احسب التكلفة بشرائح الكهرباء المصرية:
+   0-50 كيلوواط = 0.41 جنيه/كيلوواط
+   51-100 = 0.71
+   101-200 = 1.01
+   201-350 = 1.61
+   351-650 = 1.85
+   651-1000 = 2.15
+   أكثر من 1000 = 2.35
+7. لكل جهاز اكتب وقت تشغيل محدد (مثال: "10م - 6ص" مش بس "ليلاً")
+
+أجب فقط بـ JSON array بالتنسيق ده، بدون أي كلام تاني:
 [
   {
-    "name": "توفير أقصى",
-    "emoji": "💰",
-    "description": "وصف مختصر",
-    "predictedMonthlyCost": 650.0,
-    "savingsEGP": 350.0,
+    "name": "جدول الليل",
+    "emoji": "🌙",
+    "description": "وصف أسلوب الخطة وليه هي مناسبة",
+    "predictedMonthlyCost": 960.0,
+    "savingsEGP": 40.0,
     "withinBudget": true,
-    "tips": "نصيحة عملية",
+    "tips": "نصيحة عملية ومحددة",
     "devices": [
       {
-        "deviceName": "اسم الجهاز",
-        "hoursPerDay": 4.0,
-        "bestTimeSlot": "10م - 2ص",
-        "monthlyCost": 180.0
+        "deviceName": "اسم الجهاز زي ما هو مكتوب فوق",
+        "hoursPerDay": 8.0,
+        "bestTimeSlot": "10م - 6ص",
+        "monthlyCost": 320.0
       }
     ]
-  },
-  {
-    "name": "توازن",
-    "emoji": "⚖️",
-    "description": "...",
-    "predictedMonthlyCost": 750.0,
-    "savingsEGP": 250.0,
-    "withinBudget": true,
-    "tips": "...",
-    "devices": []
-  },
-  {
-    "name": "راحة",
-    "emoji": "😊",
-    "description": "...",
-    "predictedMonthlyCost": 950.0,
-    "savingsEGP": 50.0,
-    "withinBudget": true,
-    "tips": "...",
-    "devices": []
   }
 ]
 ''';

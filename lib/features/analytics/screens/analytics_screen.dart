@@ -7,6 +7,7 @@ import '../../../providers/consumption_provider.dart';
 import '../../../providers/devices_provider.dart';
 import '../widgets/consumption_chart.dart';
 import '../widgets/device_pie_chart.dart';
+import '../../notifications/widgets/notification_bell.dart';
 
 /// Computes the percentage change in kWh between last week and this week.
 /// Returns null if there is insufficient data.
@@ -98,6 +99,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          const NotificationBell(),
           IconButton(
             icon: const Icon(Icons.picture_as_pdf_outlined),
             onPressed: () {
