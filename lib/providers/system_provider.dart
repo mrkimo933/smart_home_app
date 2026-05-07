@@ -35,9 +35,10 @@ final systemProvider = Provider<void>((ref) {
     });
   }
 
+  Timer? smartCheckTimer;
+
   void startSmartChecks() {
-    // _smartCheckTimer?.cancel();
-    Timer.periodic(const Duration(minutes: 15), (timer) async {
+    smartCheckTimer = Timer.periodic(const Duration(minutes: 15), (timer) async {
       final now = DateTime.now();
       final devices = ref.read(devicesProvider);
       final mqtt = ref.read(mqttControllerProvider);
@@ -107,7 +108,7 @@ final systemProvider = Provider<void>((ref) {
   startSmartChecks();
 
   ref.onDispose(() {
-    // _smartCheckTimer?.cancel();
+    smartCheckTimer?.cancel();
   });
 
   return;

@@ -340,6 +340,17 @@ class DatabaseService {
     return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 
+  // Get overcurrent incidents
+  Future<List<Map<String, dynamic>>> getOvercurrentIncidents() async {
+    if (kIsWeb) return [];
+    final db = await database;
+    return await db.query(
+      'overcurrent_incidents',
+      orderBy: 'timestamp DESC',
+      limit: 100,
+    );
+  }
+
   // Overcurrent incidents log
   Future<void> logOvercurrentIncident({
     required int deviceId,

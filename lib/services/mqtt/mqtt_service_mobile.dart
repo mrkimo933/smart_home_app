@@ -5,8 +5,10 @@ import 'dart:async';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:smart_home_app/models/consumption_record.dart';
 import 'package:smart_home_app/services/database_service.dart';
 import 'package:smart_home_app/services/mqtt/mqtt_service_interface.dart';
+import 'package:smart_home_app/core/utils/electricity_calculator.dart';
 import '../../core/constants/mqtt_topics.dart';
 import '../../models/sensor_data.dart';
 
@@ -31,10 +33,12 @@ class MqttServiceMobile implements MqttServiceInterface {
   double _current = 0.0;
   double _power = 0.0;
   double _kwh = 0.0;
+  double _previousKwh = 0.0;
   final Map<int, bool> _relayStates = {1: false, 2: false, 3: false, 4: false};
-  
+
   Timer? _reconnectTimer;
   bool _isManuallyDisconnected = false;
+  int _reconnectAttempts = 0;
   SensorData? _latestSensorData;
   Timer? _sensorPersistTimer;
 
@@ -183,7 +187,22 @@ class MqttServiceMobile implements MqttServiceInterface {
       _sensorPersistTimer ??= Timer.periodic(const Duration(minutes: 5), (_) async {
         if (_latestSensorData != null) {
           try {
-            await DatabaseService().insertSensorData(_latestSensorData!);
+            final db = DatabaseService();
+            await db.insertSensorData(_latestSensorData!);
+
+            // Calculate delta kWh since last persist and record consumption
+            final currentKwh = _latestSensorData!.kwh;
+            final deltaKwh = currentKwh - _previousKwh;
+            if (deltaKwh > 0) {
+              final cost = ElectricityCalculator.calculateCost(deltaKwh);
+              await db.insertConsumptionRecord(ConsumptionRecord(
+                kwh: deltaKwh,
+                costEGP: cost,
+                date: DateTime.now(),
+                deviceId: 0, // 0 = house total
+              ));
+            }
+            _previousKwh = currentKwh;
           } catch (e) {
             // Log error
           }
@@ -221,6 +240,7 @@ class MqttServiceMobile implements MqttServiceInterface {
   void _onConnected() {
     _connectionStatusController.add(true);
     _reconnectTimer?.cancel();
+    _reconnectAttempts = 0; // Reset on successful connection
     _subscribeToTopics();
   }
 
@@ -233,7 +253,12 @@ class MqttServiceMobile implements MqttServiceInterface {
 
   void _scheduleReconnect() {
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 5), () {
+    // Exponential backoff: delay = min(5 * 2^attempts, 60) seconds
+    final delaySeconds = (5 * (1 << _reconnectAttempts)).clamp(5, 60);
+    _reconnectAttempts++;
+    // ignore: avoid_print
+    print('MQTT: Reconnect attempt $_reconnectAttempts in ${delaySeconds}s');
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
       connect();
     });
   }

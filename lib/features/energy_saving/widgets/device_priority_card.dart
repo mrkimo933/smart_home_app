@@ -15,9 +15,11 @@ class DevicePriorityCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final budget = ref.watch(budgetProvider);
     final recommendedDailyKwh = ElectricityCalculator.getRecommendedDailyKwh(budget);
-    
-    // We assume an even distribution for recommendation as a baseline
-    final deviceShare = recommendedDailyKwh / 4; // Assuming 4 devices
+    final devices = ref.watch(devicesProvider);
+
+    // Distribute evenly across all devices (at least 1 to avoid division by zero)
+    final deviceCount = devices.isEmpty ? 1 : devices.length;
+    final deviceShare = recommendedDailyKwh / deviceCount;
     final recommendedHours = (deviceShare * 1000) / device.wattage;
 
     return Card(

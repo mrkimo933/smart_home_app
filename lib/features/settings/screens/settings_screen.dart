@@ -9,6 +9,7 @@ import '../../../providers/devices_provider.dart';
 import '../../../providers/mqtt_provider.dart';
 import '../widgets/setting_tile.dart';
 import '../../devices/widgets/device_edit_dialog.dart';
+import '../../incidents/screens/incident_log_screen.dart';
 import '../../simulation/simulation_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -240,6 +241,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   builder: (context) => DeviceEditDialog(device: device),
                 ),
               )).toList(),
+            ),
+            _buildSection(
+              'System',
+              [
+                SettingTile(
+                  icon: Icons.warning_amber_rounded,
+                  title: 'Incident Log',
+                  subtitle: 'View overcurrent incidents',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const IncidentLogScreen()),
+                  ),
+                ),
+              ],
             ),
             _buildSection(
               'وضع العرض التجريبي',

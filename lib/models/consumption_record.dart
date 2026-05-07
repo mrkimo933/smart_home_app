@@ -38,7 +38,7 @@ class ConsumptionRecord {
       id: map['id'] as int?,
       kwh: (map['kwh'] as num).toDouble(),
       costEGP: (map['costEGP'] as num).toDouble(),
-      date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
+      date: DateTime.parse(map['date'] as String),
       deviceId: map['deviceId'] as int,
     );
   }
@@ -48,7 +48,7 @@ class ConsumptionRecord {
       'id': id,
       'kwh': kwh,
       'costEGP': costEGP,
-      'date': date.millisecondsSinceEpoch,
+      'date': date.toIso8601String(),
       'deviceId': deviceId,
     };
   }

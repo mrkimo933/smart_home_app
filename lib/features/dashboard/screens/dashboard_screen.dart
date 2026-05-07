@@ -213,7 +213,7 @@ class DashboardScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 24),
-              BillPredictionCard(currentKwh: data.kwh),
+              const BillPredictionCard(),
               const SizedBox(height: 24),
               const QuickActionsBar(),
               const SizedBox(height: 24),

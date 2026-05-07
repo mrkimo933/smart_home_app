@@ -62,7 +62,8 @@ class _SchedulesScreenState extends ConsumerState<SchedulesScreen> {
       }
 
       // Check OFF trigger
-      if (schedule.offTime.hour == currentTime.hour && 
+      if (schedule.repeatDays[dayIndex] &&
+          schedule.offTime.hour == currentTime.hour &&
           schedule.offTime.minute == currentTime.minute) {
         mqtt.toggleRelay(schedule.deviceId, false);
       }
@@ -206,30 +207,37 @@ class _AddScheduleSheetState extends State<_AddScheduleSheet> {
             onChanged: (val) => setState(() => _selectedDevice = val!),
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
+          Builder(
+            builder: (context) {
+              final isRtl = Directionality.of(context) == TextDirection.rtl;
+              final onTile = Expanded(
                 child: _TimePickerTile(
-                  label: 'وقت الإيقاف',
-                  time: _offTime,
-                  onTap: () async {
-                    final picked = await showTimePicker(context: context, initialTime: _offTime);
-                    if (picked != null) setState(() => _offTime = picked);
-                  },
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _TimePickerTile(
-                  label: 'وقت التشغيل',
+                  label: isRtl ? 'وقت التشغيل' : 'ON Time',
                   time: _onTime,
                   onTap: () async {
                     final picked = await showTimePicker(context: context, initialTime: _onTime);
                     if (picked != null) setState(() => _onTime = picked);
                   },
                 ),
-              ),
-            ],
+              );
+              final offTile = Expanded(
+                child: _TimePickerTile(
+                  label: isRtl ? 'وقت الإيقاف' : 'OFF Time',
+                  time: _offTime,
+                  onTap: () async {
+                    final picked = await showTimePicker(context: context, initialTime: _offTime);
+                    if (picked != null) setState(() => _offTime = picked);
+                  },
+                ),
+              );
+              // In RTL: ON (right) then OFF (left) — Row children order is reversed visually
+              // Place ON first in the list so it appears on the right in RTL
+              return Row(
+                children: isRtl
+                    ? [onTile, const SizedBox(width: 16), offTile]
+                    : [onTile, const SizedBox(width: 16), offTile],
+              );
+            },
           ),
           const SizedBox(height: 24),
           const Text('تكرار في أيام:', style: TextStyle(color: AppColors.textSecondary, fontSize: 13), textAlign: TextAlign.right),

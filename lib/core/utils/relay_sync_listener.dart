@@ -90,7 +90,8 @@ final relaySyncListenerProvider = Provider<void>((ref) {
   });
 
   // ── Periodic: device timers (Feature 6) + long-usage warnings ─────────────
-  Timer.periodic(const Duration(minutes: 1), (_) {
+  Timer? periodicTimer;
+  periodicTimer = Timer.periodic(const Duration(minutes: 1), (_) {
     final now = DateTime.now();
     final devices = ref.read(devicesProvider);
     final mqttService = ref.read(mqttServiceProvider);
@@ -128,7 +129,11 @@ final relaySyncListenerProvider = Provider<void>((ref) {
       }
     }
   });
+  ref.onDispose(() => periodicTimer?.cancel());
 });
+
+// ── House breaker limit (configurable) ────────────────────────────────────
+const double kHouseBreakerAmps = 30.0;
 
 // ── Overcurrent detection ──────────────────────────────────────────────────
 
@@ -138,26 +143,34 @@ void _checkOvercurrent(
   Ref ref,
   NotificationService notificationService,
 ) {
-  for (final device in devices) {
-    if (!device.isOn) continue;
-    final threshold = device.maxCurrentAmps * 1.3;
-    if (data.current > threshold) {
-      notificationService.sendOvercurrentAlert(
-        device.name,
-        data.current,
-        device.maxCurrentAmps,
-      );
-      // Auto-disconnect
-      ref.read(mqttServiceProvider).publishRelayCommand(device.relayId, false);
-      ref.read(devicesProvider.notifier).toggleDevice(device.relayId, false);
-      // Log incident
-      ref.read(databaseServiceProvider).logOvercurrentIncident(
-            deviceId: device.id,
-            deviceName: device.name,
-            current: data.current,
-            maxCurrent: device.maxCurrentAmps,
-          );
+  // Compare total house current against the house breaker limit
+  const threshold = kHouseBreakerAmps * 1.1; // 10% tolerance
+  if (data.current > threshold) {
+    // Find the highest-wattage non-essential device to disconnect first
+    final onDevices = devices.where((d) => d.isOn).toList()
+      ..sort((a, b) => b.wattage.compareTo(a.wattage));
+
+    final targetDevice = onDevices.isNotEmpty ? onDevices.first : null;
+
+    notificationService.sendOvercurrentAlert(
+      targetDevice?.name ?? 'House',
+      data.current,
+      kHouseBreakerAmps,
+    );
+
+    if (targetDevice != null) {
+      // Auto-disconnect highest-wattage device
+      ref.read(mqttServiceProvider).publishRelayCommand(targetDevice.relayId, false);
+      ref.read(devicesProvider.notifier).toggleDevice(targetDevice.relayId, false);
     }
+
+    // Log incident
+    ref.read(databaseServiceProvider).logOvercurrentIncident(
+          deviceId: targetDevice?.id ?? 0,
+          deviceName: targetDevice?.name ?? 'House',
+          current: data.current,
+          maxCurrent: kHouseBreakerAmps,
+        );
   }
 }
 

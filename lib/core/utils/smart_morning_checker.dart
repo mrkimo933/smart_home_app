@@ -9,7 +9,8 @@ import '../../services/notification_service.dart';
 final smartMorningProvider = Provider<void>((ref) {
   if (kIsWeb) return; // Notifications not supported on web
 
-  Timer.periodic(const Duration(minutes: 1), (_) async {
+  Timer? morningTimer;
+  morningTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
     final now = DateTime.now();
     // Only run during morning window 6 AM – 10 AM
     if (now.hour < 6 || now.hour >= 10) return;
@@ -72,7 +73,7 @@ final smartMorningProvider = Provider<void>((ref) {
     }
   });
 
-  ref.onDispose(() {});
+  ref.onDispose(() => morningTimer?.cancel());
 });
 
 /// Helper: turn off all lamp devices via MQTT

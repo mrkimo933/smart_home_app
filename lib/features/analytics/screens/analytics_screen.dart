@@ -2,10 +2,39 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/export_service.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_strings.dart';
 import '../../../providers/consumption_provider.dart';
 import '../../../providers/devices_provider.dart';
 import '../widgets/consumption_chart.dart';
 import '../widgets/device_pie_chart.dart';
+
+/// Computes the percentage change in kWh between last week and this week.
+/// Returns null if there is insufficient data.
+final weeklyInsightProvider = FutureProvider<String>((ref) async {
+  final db = ref.watch(databaseServiceProvider);
+  final now = DateTime.now();
+
+  final thisWeekFrom = now.subtract(const Duration(days: 7));
+  final lastWeekFrom = now.subtract(const Duration(days: 14));
+  final lastWeekTo = now.subtract(const Duration(days: 7));
+
+  final thisWeek = await db.getConsumptionByRange(thisWeekFrom, now);
+  final lastWeek = await db.getConsumptionByRange(lastWeekFrom, lastWeekTo);
+
+  final thisKwh = thisWeek.fold(0.0, (sum, r) => sum + r.kwh);
+  final lastKwh = lastWeek.fold(0.0, (sum, r) => sum + r.kwh);
+
+  if (lastKwh == 0) return 'Insufficient data';
+
+  final change = ((thisKwh - lastKwh) / lastKwh * 100).roundToDouble();
+  if (change > 0) {
+    return '${change.abs().toStringAsFixed(0)}% more than last week';
+  } else if (change < 0) {
+    return '${change.abs().toStringAsFixed(0)}% less than last week';
+  } else {
+    return 'Same as last week';
+  }
+});
 
 class AnalyticsScreen extends ConsumerStatefulWidget {
   const AnalyticsScreen({super.key});
@@ -60,11 +89,12 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
     final totalKwhAsync = ref.watch(monthlyKwhProvider);
     final totalCostAsync = ref.watch(monthlyCostProvider);
     final devices = ref.watch(devicesProvider);
+    final language = ref.watch(languageProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('الإحصائيات', style: TextStyle(color: AppColors.textPrimary)),
+        title: Text(AppStrings.getString(language, 'analytics'), style: const TextStyle(color: AppColors.textPrimary)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
@@ -91,10 +121,10 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
           indicatorColor: AppColors.primaryBlue,
           labelColor: AppColors.primaryBlue,
           unselectedLabelColor: AppColors.textSecondary,
-          tabs: const [
-            Tab(text: 'يومي'),
-            Tab(text: 'أسبوعي'),
-            Tab(text: 'شهري'),
+          tabs: [
+            Tab(text: AppStrings.getString(language, 'daily')),
+            Tab(text: AppStrings.getString(language, 'weekly')),
+            Tab(text: AppStrings.getString(language, 'monthly')),
           ],
         ),
       ),
@@ -103,9 +133,9 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'استهلاك الطاقة',
-              style: TextStyle(
+            Text(
+              AppStrings.getString(language, 'energyConsumption'),
+              style: const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -127,7 +157,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
                     height: 200,
                     child: Center(child: CircularProgressIndicator()),
                   ),
-                  error: (e, _) => Center(child: Text('خطأ: $e')),
+                  error: (e, _) => Center(child: Text('Error: $e')),
                 ),
               ),
             ),
@@ -136,7 +166,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
               children: [
                 Expanded(
                   child: _SummaryCard(
-                    title: 'التكلفة (ج.م)',
+                    title: AppStrings.getString(language, 'costEGP'),
                     value: totalCostAsync.maybeWhen(
                       data: (v) => v.toStringAsFixed(2),
                       orElse: () => '...',
@@ -147,7 +177,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
                 const SizedBox(width: 12),
                 Expanded(
                   child: _SummaryCard(
-                    title: 'إجمالي (kWh)',
+                    title: AppStrings.getString(language, 'totalKwh'),
                     value: totalKwhAsync.maybeWhen(
                       data: (v) => v.toStringAsFixed(1),
                       orElse: () => '...',
@@ -159,7 +189,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
             ),
             const SizedBox(height: 12),
             _SummaryCard(
-              title: 'المعدل اليومي',
+              title: AppStrings.getString(language, 'dailyAverage'),
               value: totalKwhAsync.maybeWhen(
                 data: (v) => (v / DateTime.now().day).toStringAsFixed(1),
                 orElse: () => '...',
@@ -168,11 +198,11 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
               isWide: true,
             ),
             const SizedBox(height: 24),
-            _buildInsightsSection(devices),
+            _buildInsightsSection(devices, language),
             const SizedBox(height: 32),
-            const Text(
-              'توزيع استهلاك الأجهزة',
-              style: TextStyle(
+            Text(
+              AppStrings.getString(language, 'deviceDistribution'),
+              style: const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -195,13 +225,15 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
     );
   }
 
-  Widget _buildInsightsSection(List<dynamic> devices) {
+  Widget _buildInsightsSection(List<dynamic> devices, AppLanguage language) {
+    final weeklyInsightAsync = ref.watch(weeklyInsightProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Smart Insights 💡',
-          style: TextStyle(
+        Text(
+          AppStrings.getString(language, 'smartInsights'),
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -209,11 +241,23 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
           textAlign: TextAlign.left,
         ),
         const SizedBox(height: 16),
-        _buildInsightCard('📈 35% more than last week', 'Your energy usage is higher than usual. Consider reducing AC time.', AppColors.errorRed),
-        _buildInsightCard('Peak usage: 7PM - 10PM daily', 'Shift heavy usage devices to off-peak hours to save money.', Colors.orangeAccent),
-        if (devices.isNotEmpty) 
-          _buildInsightCard('${devices.first.name} accounts for 60% of your bill', 'You could save ~80 EGP by reducing ${devices.first.name} by 2hrs/day.', AppColors.primaryBlue),
-        _buildInsightCard('Best Day: Tuesday', 'You used only 4.2 kWh.', AppColors.accentGreen),
+        weeklyInsightAsync.when(
+          data: (insight) => _buildInsightCard(
+            insight,
+            insight == 'Insufficient data'
+                ? 'Collect more data to see weekly comparisons.'
+                : 'Monitor your usage trend to stay within budget.',
+            AppColors.errorRed,
+          ),
+          loading: () => _buildInsightCard('Loading...', '', AppColors.errorRed),
+          error: (_, __) => _buildInsightCard('N/A', 'Could not load weekly comparison.', AppColors.errorRed),
+        ),
+        if (devices.isNotEmpty)
+          _buildInsightCard(
+            'Top device: ${devices.first.name}',
+            'Rated ${devices.first.wattage.toStringAsFixed(0)}W. Reduce usage to lower your bill.',
+            AppColors.primaryBlue,
+          ),
       ],
     );
   }

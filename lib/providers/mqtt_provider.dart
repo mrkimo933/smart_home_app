@@ -2,7 +2,6 @@
 
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'devices_provider.dart';
 import 'package:smart_home_app/services/mqtt/mqtt_service.dart';
 import 'package:smart_home_app/services/mqtt/mqtt_service_interface.dart';
 
@@ -86,29 +85,6 @@ final voltageStatusProvider = Provider<VoltageStatus>((ref) {
 final relayStatesProvider = StreamProvider<Map<int, bool>>((ref) {
   final mqttService = ref.watch(mqttServiceProvider);
   return mqttService.relayStatesStream;
-});
-
-/// Sync relay states to devices provider (simple debounced sync)
-final relaySyncProvider = Provider<void>((ref) {
-  final debounceMap = <int, Timer>{};
-  ref.listen<AsyncValue<Map<int, bool>>>(relayStatesProvider, (previous, next) {
-    next.whenData((map) {
-      final devicesState = ref.read(devicesProvider);
-      final devicesNotifier = ref.read(devicesProvider.notifier);
-      map.forEach((relayId, isOn) {
-        final matches = devicesState.where((d) => d.relayId == relayId);
-        if (matches.isEmpty) return;
-        final device = matches.first;
-        if (device.isOn != isOn) {
-          debounceMap[relayId]?.cancel();
-          debounceMap[relayId] = Timer(const Duration(milliseconds: 300), () {
-            devicesNotifier.toggleDevice(relayId, isOn);
-          });
-        }
-      });
-    });
-  });
-  return;
 });
 
 /// Helper class to handle relay actions

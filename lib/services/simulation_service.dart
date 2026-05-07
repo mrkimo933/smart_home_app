@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/sensor_data.dart';
+import '../core/utils/electricity_calculator.dart';
 
 enum SimulationScenario { normalDay, highConsumption, savingDay }
 
@@ -227,7 +228,7 @@ class SimulationNotifier extends StateNotifier<SimulationState> {
       _dataController.add(data);
 
       final newKwh = state.totalKwh + data.kwh;
-      final cost = newKwh * 1.4; // ~1.4 EGP/kWh average
+      final cost = ElectricityCalculator.calculateCost(newKwh);
 
       state = state.copyWith(
         simulatedHour: newHour,

@@ -12,7 +12,6 @@ import 'core/localization/app_localizations.dart';
 import 'core/theme/app_theme.dart';
 import 'services/notification_service.dart';
 import 'core/constants/app_strings.dart';
-import 'providers/mqtt_provider.dart';
 import 'providers/system_provider.dart';
 import 'providers/consumption_provider.dart';
 import 'core/utils/app_lifecycle_handler.dart';
@@ -22,6 +21,7 @@ import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/devices/screens/devices_screen.dart';
 import 'features/analytics/screens/analytics_screen.dart';
 import 'features/energy_saving/screens/energy_saving_screen.dart';
+import 'features/schedules/screens/schedules_screen.dart';
 import 'features/settings/screens/settings_screen.dart';
 import 'features/splash/splash_screen.dart';
 
@@ -51,31 +51,39 @@ void main() async {
   );
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Ensure relay sync provider is read so it registers its listeners
-    ref.read(relaySyncProvider);
-    // Ensure relay search sync listener is active
-    ref.read(relaySyncListenerProvider);
-    // Activate house budget alert listener
-    ref.read(houseBudgetAlertProvider);
-    // Ensure system provider is read so midnight reset and other tasks run
-    ref.read(systemProvider);
-    // Ensure lifecycle handler is active
-    ref.read(appLifecycleProvider(ref));
-    // Smart morning notifications
-    ref.read(smartMorningProvider);
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Register all background providers once — safe to do in initState
+    Future.microtask(() {
+      if (!mounted) return;
+      try { ref.read(relaySyncListenerProvider); } catch (_) {}
+      try { ref.read(houseBudgetAlertProvider); } catch (_) {}
+      try { ref.read(systemProvider); } catch (_) {}
+      try { ref.read(appLifecycleProvider(ref)); } catch (_) {}
+      if (!kIsWeb) {
+        try { ref.read(smartMorningProvider); } catch (_) {}
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final language = ref.watch(languageProvider);
 
-    
     return MaterialApp(
       title: AppStrings.getString(language, 'appName'),
       theme: AppTheme.darkTheme,
       debugShowCheckedModeBanner: false,
-      
+
       // Localization setup
       locale: Locale(language == AppLanguage.en ? 'en' : 'ar'),
       supportedLocales: const [
@@ -94,6 +102,7 @@ class MyApp extends ConsumerWidget {
   }
 }
 
+
 class MainScreen extends ConsumerWidget {
   const MainScreen({super.key});
 
@@ -107,6 +116,7 @@ class MainScreen extends ConsumerWidget {
       const DevicesScreen(),
       const AnalyticsScreen(),
       const EnergySavingScreen(),
+      const SchedulesScreen(),
       const SettingsScreen(),
     ];
 
@@ -134,6 +144,10 @@ class MainScreen extends ConsumerWidget {
           BottomNavigationBarItem(
             icon: const Icon(Icons.eco_rounded),
             label: AppStrings.getString(language, 'energySaving'),
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.schedule_rounded),
+            label: AppStrings.getString(language, 'schedules'),
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.settings_rounded),

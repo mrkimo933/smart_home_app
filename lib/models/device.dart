@@ -21,6 +21,8 @@ class Device {
   final DateTime? timerStartTime;
   // For run-by-budget label
   final double? runBudgetEGP;
+  // Per-device consumption tracking: timestamp when device was turned ON
+  final DateTime? turnedOnAt;
 
   Device({
     required this.id,
@@ -37,6 +39,7 @@ class Device {
     this.timerMinutes,
     this.timerStartTime,
     this.runBudgetEGP,
+    this.turnedOnAt,
   }) : maxCurrentAmps = maxCurrentAmps ?? _defaultMaxCurrent(icon);
 
   static double defaultMaxCurrentForIcon(String icon) =>
@@ -133,6 +136,7 @@ class Device {
     Object? timerMinutes = _$sentinel,
     Object? timerStartTime = _$sentinel,
     Object? runBudgetEGP = _$sentinel,
+    Object? turnedOnAt = _$sentinel,
   }) {
     return Device(
       id: id ?? this.id,
@@ -157,6 +161,9 @@ class Device {
       runBudgetEGP: identical(runBudgetEGP, _$sentinel)
           ? this.runBudgetEGP
           : runBudgetEGP as double?,
+      turnedOnAt: identical(turnedOnAt, _$sentinel)
+          ? this.turnedOnAt
+          : turnedOnAt as DateTime?,
     );
   }
 

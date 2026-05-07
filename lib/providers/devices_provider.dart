@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/device.dart';
+import '../models/consumption_record.dart';
+import '../core/utils/electricity_calculator.dart';
 import '../services/database_service.dart';
 
 final databaseServiceProvider = Provider<DatabaseService>((ref) {
@@ -59,8 +61,35 @@ class DevicesNotifier extends StateNotifier<List<Device>> {
   Future<void> toggleDevice(int relayId, bool isOn) async {
     final index = state.indexWhere((d) => d.relayId == relayId);
     if (index == -1) return;
-    final device = state[index].copyWith(isOn: isOn);
-    await updateDevice(device);
+    final existing = state[index];
+
+    if (isOn) {
+      // Record the timestamp when the device is turned ON
+      final device = existing.copyWith(isOn: true, turnedOnAt: DateTime.now());
+      await updateDevice(device);
+    } else {
+      // Calculate kWh consumed since device was turned ON
+      final turnedOnAt = existing.turnedOnAt;
+      if (turnedOnAt != null) {
+        final hoursOn = DateTime.now().difference(turnedOnAt).inMinutes / 60.0;
+        if (hoursOn > 0) {
+          final kwh = (existing.wattage / 1000.0) * hoursOn;
+          final cost = ElectricityCalculator.calculateCost(kwh);
+          try {
+            await _dbService.insertConsumptionRecord(ConsumptionRecord(
+              kwh: kwh,
+              costEGP: cost,
+              date: DateTime.now(),
+              deviceId: existing.id,
+            ));
+          } catch (_) {
+            // Non-critical — don't block toggle
+          }
+        }
+      }
+      final device = existing.copyWith(isOn: false, turnedOnAt: null);
+      await updateDevice(device);
+    }
   }
 
   Future<void> updateOnTime(int relayId, int minutes) async {

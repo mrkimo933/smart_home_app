@@ -1,21 +1,31 @@
 // lib/features/dashboard/widgets/bill_prediction_card.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/electricity_calculator.dart';
+import '../../../providers/consumption_provider.dart';
 
-class BillPredictionCard extends StatelessWidget {
-  final double currentKwh;
+class BillPredictionCard extends ConsumerWidget {
   final double monthlyBudget;
 
   const BillPredictionCard({
     super.key,
-    required this.currentKwh,
     this.monthlyBudget = 500.0, // Default budget in EGP
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final monthlyKwhAsync = ref.watch(monthlyKwhProvider);
+
+    return monthlyKwhAsync.when(
+      data: (monthlyKwh) => _buildCard(monthlyKwh),
+      loading: () => _buildCard(0.0, isLoading: true),
+      error: (_, __) => _buildCard(0.0),
+    );
+  }
+
+  Widget _buildCard(double currentKwh, {bool isLoading = false}) {
     final currentDay = DateTime.now().day;
     final currentCost = ElectricityCalculator.calculateCost(currentKwh);
     final predictedBill = ElectricityCalculator.predictMonthlyBill(currentKwh, currentDay);
@@ -52,15 +62,17 @@ class BillPredictionCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          Row(
-            children: [
-              _buildInfoItem('Current', '${currentCost.toStringAsFixed(1)} EGP'),
-              _buildDivider(),
-              _buildInfoItem('Predicted', '${predictedBill.toStringAsFixed(1)} EGP'),
-              _buildDivider(),
-              _buildInfoItem('Usage', '${currentKwh.toStringAsFixed(1)} kWh'),
-            ],
-          ),
+          isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Row(
+                  children: [
+                    _buildInfoItem('Current', '${currentCost.toStringAsFixed(1)} EGP'),
+                    _buildDivider(),
+                    _buildInfoItem('Predicted', '${predictedBill.toStringAsFixed(1)} EGP'),
+                    _buildDivider(),
+                    _buildInfoItem('Usage', '${currentKwh.toStringAsFixed(1)} kWh'),
+                  ],
+                ),
           const SizedBox(height: 20),
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
