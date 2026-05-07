@@ -11,6 +11,7 @@ import '../widgets/setting_tile.dart';
 import '../../devices/widgets/device_edit_dialog.dart';
 import '../../incidents/screens/incident_log_screen.dart';
 import '../../simulation/simulation_screen.dart';
+import '../../../services/ai_scenario_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -22,8 +23,10 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _espIpController = TextEditingController();
   final _budgetController = TextEditingController();
+  final _groqKeyController = TextEditingController();
   TimeOfDay _autoOffTime = const TimeOfDay(hour: 7, minute: 0);
   bool _isTesting = false;
+  bool _isTestingGroq = false;
 
   @override
   void initState() {
@@ -35,6 +38,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     final espService = ref.read(httpEspServiceProvider);
     final savedIp = await espService.getEspIp();
+    final savedGroqKey = await AiScenarioService().getApiKey();
     setState(() {
       _espIpController.text = savedIp ?? '';
       _budgetController.text =
@@ -42,6 +46,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final hour = prefs.getInt('auto_off_hour') ?? 7;
       final minute = prefs.getInt('auto_off_minute') ?? 0;
       _autoOffTime = TimeOfDay(hour: hour, minute: minute);
+      _groqKeyController.text = savedGroqKey ?? '';
     });
   }
 
@@ -75,6 +80,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void dispose() {
     _espIpController.dispose();
     _budgetController.dispose();
+    _groqKeyController.dispose();
     super.dispose();
   }
 
@@ -244,6 +250,103 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         ),
                       ))
                   .toList(),
+            ),
+            _buildSection(
+              'الذكاء الاصطناعي',
+              [
+                TextField(
+                  controller: _groqKeyController,
+                  obscureText: true,
+                  style: const TextStyle(color: AppColors.textPrimary),
+                  decoration: InputDecoration(
+                    labelText: 'Groq API Key',
+                    hintText: 'gsk_...',
+                    helperText: 'احصل على API Key مجاني من console.groq.com',
+                    labelStyle:
+                        const TextStyle(color: AppColors.textSecondary),
+                    helperStyle:
+                        const TextStyle(color: AppColors.textSecondary),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.save,
+                          color: AppColors.primaryBlue),
+                      onPressed: () async {
+                        await AiScenarioService()
+                            .saveApiKey(_groqKeyController.text.trim());
+                        if (mounted) {
+                          _showSnackbar('Groq API Key Saved!',
+                              isError: false);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isTestingGroq
+                            ? null
+                            : () async {
+                                setState(
+                                    () => _isTestingGroq = true);
+                                final key =
+                                    _groqKeyController.text.trim();
+                                final ok = await AiScenarioService()
+                                    .testApiKey(key);
+                                if (mounted) {
+                                  setState(
+                                      () => _isTestingGroq = false);
+                                  _showSnackbar(
+                                    ok
+                                        ? '✅ Groq API متصل!'
+                                        : '❌ API Key غلط أو مفيش إنترنت',
+                                    isError: !ok,
+                                  );
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              AppColors.primaryBlue.withAlpha(180),
+                          foregroundColor: Colors.white,
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: _isTestingGroq
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Test Connection'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          await AiScenarioService()
+                              .saveApiKey(_groqKeyController.text.trim());
+                          if (mounted) {
+                            _showSnackbar('Groq API Key Saved!',
+                                isError: false);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryBlue,
+                          foregroundColor: Colors.white,
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text('Save'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
             _buildSection(
               'System',

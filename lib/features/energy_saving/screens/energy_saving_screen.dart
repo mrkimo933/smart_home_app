@@ -9,6 +9,7 @@ import '../../../providers/consumption_provider.dart';
 import '../../../providers/esp_provider.dart';
 import '../../../services/notification_service.dart';
 import '../widgets/device_priority_card.dart';
+import 'ai_scenarios_screen.dart';
 
 final energySavingModeProvider = StateProvider<bool>((ref) => false);
 
@@ -273,6 +274,49 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // AI Scenarios button
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: () {
+                  final monthlyKwhAsync = ref.read(monthlyKwhProvider);
+                  final currentKwh = monthlyKwhAsync.value ?? 0.0;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AiScenariosScreen(
+                        budgetEGP: budget,
+                        currentDay: DateTime.now().day,
+                        currentKwh: currentKwh,
+                        devices: devices,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Text('✨', style: TextStyle(fontSize: 20)),
+                label: const Text(
+                  'اقتراحات الذكاء الاصطناعي',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white),
+                ),
+              ),
+            ),
             // Feature 2: House Budget card at the top
             _buildHouseBudgetCard(budget, spentThisMonth),
             const SizedBox(height: 24),
