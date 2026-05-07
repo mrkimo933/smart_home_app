@@ -43,6 +43,32 @@ class AiScenarioService {
     }
   }
 
+  String _getDeviceNature(String deviceName) {
+    final name = deviceName.toLowerCase();
+    if (name.contains('fridge') || name.contains('refrigerator') || name.contains('ثلاجة')) {
+      return 'Must run 24h/day, cannot be turned off';
+    }
+    if (name.contains('ac') || name.contains('air') || name.contains('تكييف')) {
+      return 'Cooling device, best used at night (10pm-6am) to save cost';
+    }
+    if (name.contains('heater') || name.contains('سخان')) {
+      return 'Use max 1-2 hours/day, prefer morning';
+    }
+    if (name.contains('wash') || name.contains('غسالة')) {
+      return 'Use every 2-3 days, 1 hour per use, prefer off-peak';
+    }
+    if (name.contains('tv') || name.contains('تلفزيون')) {
+      return 'Evening use 6pm-11pm, ~4 hours/day';
+    }
+    if (name.contains('lamp') || name.contains('light') || name.contains('نور') || name.contains('إضاءة')) {
+      return 'Evening lighting, 6-8 hours/day';
+    }
+    if (name.contains('computer') || name.contains('laptop') || name.contains('كمبيوتر')) {
+      return 'Work/study device, 4-8 hours/day';
+    }
+    return 'General device, estimate based on $deviceName wattage and typical usage';
+  }
+
   Future<List<EnergyScenario>> generateScenarios({
     required double budgetEGP,
     required int currentDay,
@@ -55,73 +81,81 @@ class AiScenarioService {
       throw Exception('NO_API_KEY');
     }
 
-    final deviceList = devices
-        .map((d) => '- ${d.name}: ${d.wattage}W, أولوية: ${d.priority.name}')
-        .join('\n');
+    final deviceContext = devices.map((d) {
+      final nature = _getDeviceNature(d.name);
+      return '- ${d.name}: ${d.wattage}W | طبيعة الجهاز: $nature';
+    }).join('\n');
 
-    final userContent = '''المستخدم لديه ميزانية شهرية: $budgetEGP جنيه مصري
+    final userContent = '''
+أنت مستشار طاقة ذكي متخصص في المنازل المصرية.
 
-اليوم: $currentDay من الشهر
-الاستهلاك حتى الآن: ${currentKwh.toStringAsFixed(2)} كيلوواط/ساعة
-التكلفة حتى الآن: ${currentCostEGP.toStringAsFixed(2)} جنيه
+ميزانية المستخدم الشهرية: $budgetEGP جنيه
+اليوم الحالي من الشهر: $currentDay
+الاستهلاك الحالي هذا الشهر: ${currentKwh.toStringAsFixed(2)} كيلوواط/ساعة
+التكلفة الحالية: ${currentCostEGP.toStringAsFixed(2)} جنيه
 
-أجهزته:
-$deviceList
+الأجهزة المتاحة:
+$deviceContext
 
-شرائح أسعار الكهرباء المصرية 2024:
-- 0 إلى 50 كيلوواط = 0.41 جنيه/كيلوواط
-- 51 إلى 100 كيلوواط = 0.71 جنيه/كيلوواط
-- 101 إلى 200 كيلوواط = 1.01 جنيه/كيلوواط
-- 201 إلى 350 كيلوواط = 1.61 جنيه/كيلوواط
-- 351 إلى 650 كيلوواط = 1.85 جنيه/كيلوواط
-- 651 إلى 1000 كيلوواط = 2.15 جنيه/كيلوواط
-- أكثر من 1000 كيلوواط = 2.35 جنيه/كيلوواط
+تعليمات مهمة جداً:
+1. افهم طبيعة كل جهاز (الثلاجة تشتغل 24 ساعة، التكييف أفضل ليلاً، السخان ساعة يومياً)
+2. الميزانية ($budgetEGP جنيه) هي الحد الأقصى للصرف - اعمل خططاً تستغل الميزانية بشكل ذكي
+3. اعمل 3 خطط:
+   - توفير أقصى: استخدام الضروريات فقط (50-70% من الميزانية)
+   - توازن: راحة معقولة (75-90% من الميزانية)
+   - راحة: استخدام مريح (90-100% من الميزانية)
+4. احسب التكلفة باستخدام شرائح الكهرباء المصرية:
+   0-50 كيلوواط = 0.41 جنيه/كيلوواط
+   51-100 = 0.71 جنيه/كيلوواط
+   101-200 = 1.01 جنيه/كيلوواط
+   201-350 = 1.61 جنيه/كيلوواط
+   351-650 = 1.85 جنيه/كيلوواط
+   651-1000 = 2.15 جنيه/كيلوواط
+   أكثر من 1000 = 2.35 جنيه/كيلوواط
+5. لكل جهاز: حدد ساعات تشغيل يومية منطقية وأفضل وقت تشغيل
+6. النصائح يجب أن تكون عملية ومحددة
 
-بناءً على هذه البيانات الحقيقية، اقترح 3 خطط:
-1. توفير أقصى - أقل تكلفة ممكنة
-2. توازن - راحة مع توفير
-3. راحة - أقصى راحة في حدود الميزانية
-
-أعد JSON فقط بهذا الشكل بالضبط:
+أجب فقط بـ JSON array بالتنسيق التالي بالضبط، بدون أي نص إضافي أو markdown:
 [
   {
     "name": "توفير أقصى",
     "emoji": "💰",
-    "description": "وصف مختصر للخطة",
-    "predictedMonthlyCost": 450.0,
-    "savingsEGP": 150.0,
+    "description": "وصف مختصر",
+    "predictedMonthlyCost": 650.0,
+    "savingsEGP": 350.0,
     "withinBudget": true,
+    "tips": "نصيحة عملية",
     "devices": [
       {
-        "deviceName": "AC",
+        "deviceName": "اسم الجهاز",
         "hoursPerDay": 4.0,
         "bestTimeSlot": "10م - 2ص",
-        "monthlyCost": 280.0
+        "monthlyCost": 180.0
       }
-    ],
-    "tips": "نصيحة مختصرة للمستخدم"
+    ]
   },
   {
     "name": "توازن",
     "emoji": "⚖️",
     "description": "...",
-    "predictedMonthlyCost": 500.0,
-    "savingsEGP": 100.0,
+    "predictedMonthlyCost": 750.0,
+    "savingsEGP": 250.0,
     "withinBudget": true,
-    "devices": [],
-    "tips": "..."
+    "tips": "...",
+    "devices": []
   },
   {
     "name": "راحة",
     "emoji": "😊",
     "description": "...",
-    "predictedMonthlyCost": 600.0,
-    "savingsEGP": 0.0,
-    "withinBudget": false,
-    "devices": [],
-    "tips": "..."
+    "predictedMonthlyCost": 950.0,
+    "savingsEGP": 50.0,
+    "withinBudget": true,
+    "tips": "...",
+    "devices": []
   }
-]''';
+]
+''';
 
     return await _callApi(apiKey, userContent);
   }

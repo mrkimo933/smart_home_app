@@ -10,9 +10,11 @@ import '../../../models/schedule.dart';
 import '../../../providers/consumption_provider.dart';
 import '../../../providers/devices_provider.dart';
 import '../../../providers/esp_provider.dart';
+import '../../../providers/system_provider.dart';
 import '../../../services/ai_scenario_service.dart';
 import '../../../services/database_service.dart';
 import '../../../services/notification_service.dart';
+import '../widgets/active_plan_tracker.dart';
 import '../widgets/device_priority_card.dart';
 
 final energySavingModeProvider = StateProvider<bool>((ref) => false);
@@ -282,6 +284,9 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
       }
     }
 
+    // Set active scenario
+    ref.read(activeScenarioProvider.notifier).state = scenario;
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -539,12 +544,17 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
     );
   }
 
-  Widget _buildScenarioCard(EnergyScenario scenario, bool isFirst, double budget) {
+  Widget _buildScenarioCard(
+      EnergyScenario scenario, bool isFirst, double budget,
+      {EnergyScenario? activeScenario}) {
     final progress =
         budget > 0 ? (scenario.predictedMonthlyCost / budget).clamp(0.0, 1.0) : 0.0;
+    final isActive = activeScenario?.name == scenario.name;
 
     Color borderColor;
-    if (scenario.withinBudget && isFirst) {
+    if (isActive) {
+      borderColor = const Color(0xFF00F5A0);
+    } else if (scenario.withinBudget && isFirst) {
       borderColor = Colors.blue;
     } else if (scenario.withinBudget) {
       borderColor = Colors.green;
@@ -711,31 +721,49 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
             ],
             const SizedBox(height: 16),
             // Apply button
-            Container(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
+            if (isActive)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00F5A0).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF00F5A0)),
                 ),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                onPressed: () => _applyScenario(scenario),
                 child: const Text(
-                  'طبّق الخطة دي',
+                  'الخطة النشطة ✓',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
+                      color: Color(0xFF00F5A0),
                       fontWeight: FontWeight.bold),
                 ),
+              )
+            else
+              Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => _applyScenario(scenario),
+                  child: const Text(
+                    'طبّق الخطة دي',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -750,6 +778,7 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
     final spentThisMonth = monthlyCostAsync.value ?? 0.0;
     final budget =
         double.tryParse(_budgetController.text) ?? 500.0;
+    final activeScenario = ref.watch(activeScenarioProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -764,6 +793,9 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Active Plan Tracker
+            const ActivePlanTracker(),
+
             // Budget Input
             Container(
               padding: const EdgeInsets.all(16),
@@ -855,7 +887,8 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
               ),
               const SizedBox(height: 16),
               ..._scenarios!.asMap().entries.map(
-                    (e) => _buildScenarioCard(e.value, e.key == 0, budget),
+                    (e) => _buildScenarioCard(e.value, e.key == 0, budget,
+                        activeScenario: activeScenario),
                   ),
             ],
 

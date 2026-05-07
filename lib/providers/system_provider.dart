@@ -10,6 +10,7 @@ import '../services/notification_service.dart';
 // import '../core/utils/electricity_calculator.dart';
 import '../features/energy_saving/screens/energy_saving_screen.dart';
 import '../models/device.dart';
+import '../models/energy_scenario.dart';
 
 // Provider to handle daily reset and other system-level tasks
 final systemProvider = Provider<void>((ref) {
@@ -113,3 +114,5 @@ final systemProvider = Provider<void>((ref) {
 
   return;
 });
+
+final activeScenarioProvider = StateProvider<EnergyScenario?>((ref) => null);
