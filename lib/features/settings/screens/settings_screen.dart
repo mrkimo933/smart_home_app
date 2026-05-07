@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../providers/devices_provider.dart';
-import '../../../providers/mqtt_provider.dart';
+import '../../../providers/esp_provider.dart';
 import '../widgets/setting_tile.dart';
 import '../../devices/widgets/device_edit_dialog.dart';
 import '../../incidents/screens/incident_log_screen.dart';
@@ -20,13 +20,11 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final _ipController = TextEditingController();
-  final _portController = TextEditingController();
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _espIpController = TextEditingController();
   final _budgetController = TextEditingController();
   TimeOfDay _autoOffTime = const TimeOfDay(hour: 7, minute: 0);
-  
+  bool _isTesting = false;
+
   @override
   void initState() {
     super.initState();
@@ -35,54 +33,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    final espService = ref.read(httpEspServiceProvider);
+    final savedIp = await espService.getEspIp();
     setState(() {
-      final brokerIp = prefs.getString('mqtt_broker_ip') ?? 'broker.hivemq.com';
-      _ipController.text = brokerIp;
-      
-      final savedPort = prefs.getInt('mqtt_broker_port');
-      if (savedPort != null) {
-        _portController.text = savedPort.toString();
-      } else {
-        _portController.text = '1883';
-      }
-      
-      _usernameController.text = prefs.getString('mqtt_username') ?? '';
-      _passwordController.text = prefs.getString('mqtt_password') ?? '';
-      _budgetController.text = (prefs.getDouble('monthly_budget') ?? 500.0).toString();
+      _espIpController.text = savedIp ?? '';
+      _budgetController.text =
+          (prefs.getDouble('monthly_budget') ?? 500.0).toString();
       final hour = prefs.getInt('auto_off_hour') ?? 7;
       final minute = prefs.getInt('auto_off_minute') ?? 0;
       _autoOffTime = TimeOfDay(hour: hour, minute: minute);
     });
   }
 
-  Future<void> _updateBrokerConfig() async {
-    final host = _ipController.text.trim();
-    final port = int.tryParse(_portController.text.trim()) ?? 1883;
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text.trim();
-    
-    if (host.isNotEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('mqtt_broker_ip', host);
-      await prefs.setInt('mqtt_broker_port', port);
-      await prefs.setString('mqtt_username', username);
-      await prefs.setString('mqtt_password', password);
-      
-      // Trigger reconnect
-      ref.read(mqttServiceProvider).connect();
-      
-      _showSnackbar('MQTT Configuration updated', isError: false);
+  Future<void> _saveEspIp() async {
+    final ip = _espIpController.text.trim();
+    if (ip.isEmpty) {
+      _showSnackbar('ESP32 IP cannot be empty', isError: true);
+      return;
+    }
+    await ref.read(httpEspServiceProvider).setEspIp(ip);
+    _showSnackbar('Saved!', isError: false);
+  }
+
+  Future<void> _testConnection() async {
+    final ip = _espIpController.text.trim();
+    if (ip.isEmpty) {
+      _showSnackbar('Enter an IP address first', isError: true);
+      return;
+    }
+    setState(() => _isTesting = true);
+    final ok = await ref.read(httpEspServiceProvider).testConnection(ip);
+    setState(() => _isTesting = false);
+    if (ok) {
+      _showSnackbar('Connected to ESP32!', isError: false);
     } else {
-      _showSnackbar('Broker Host/IP cannot be empty', isError: true);
+      _showSnackbar('Cannot reach ESP32', isError: true);
     }
   }
 
   @override
   void dispose() {
-    _ipController.dispose();
-    _portController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
+    _espIpController.dispose();
     _budgetController.dispose();
     super.dispose();
   }
@@ -136,68 +127,76 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               'Connection',
               [
                 TextField(
-                  controller: _ipController,
-                  decoration: const InputDecoration(
-                    labelText: 'Broker Hostname / IP',
-                    hintText: 'e.g. xxxxx.s1.eu.hivemq.cloud',
-                    labelStyle: TextStyle(color: AppColors.textSecondary),
-                  ),
-                  style: const TextStyle(color: AppColors.textPrimary),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _portController,
+                  controller: _espIpController,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                    labelText: 'Broker Port',
-                    hintText: '8883 for SSL',
+                    labelText: 'ESP32 IP Address',
+                    hintText: '192.168.1.25',
+                    helperText: 'Enter the IP shown in Arduino Serial Monitor',
                     labelStyle: TextStyle(color: AppColors.textSecondary),
+                    helperStyle: TextStyle(color: AppColors.textSecondary),
                   ),
                   style: const TextStyle(color: AppColors.textPrimary),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'MQTT Username',
-                    labelStyle: TextStyle(color: AppColors.textSecondary),
+                const SizedBox(height: 8),
+                const Text(
+                  'Polling every 2s',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
                   ),
-                  style: const TextStyle(color: AppColors.textPrimary),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'MQTT Password',
-                    labelStyle: TextStyle(color: AppColors.textSecondary),
-                  ),
-                  style: const TextStyle(color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _updateBrokerConfig,
-                    icon: const Icon(Icons.save),
-                    label: const Text('Save Connection Settings'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryBlue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _isTesting ? null : _testConnection,
+                        icon: _isTesting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.wifi_find),
+                        label: Text(_isTesting ? 'Testing...' : 'Test Connection'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryBlue.withAlpha(180),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _saveEspIp,
+                        icon: const Icon(Icons.save),
+                        label: const Text('Save'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryBlue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 SettingTile(
                   icon: Icons.wifi,
-                  title: 'Broker Status',
+                  title: 'ESP32 Status',
                   subtitle: isConnected ? 'Connected' : 'Disconnected',
                   trailing: Container(
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: isConnected ? AppColors.connectedGreen : AppColors.disconnectedRed,
+                      color: isConnected
+                          ? AppColors.connectedGreen
+                          : AppColors.disconnectedRed,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -223,24 +222,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 SettingTile(
                   icon: Icons.wb_sunny_rounded,
                   title: 'Morning Auto-Off',
-                  subtitle: 'Turn off all non-essentials at ${_autoOffTime.format(context)}',
+                  subtitle:
+                      'Turn off all non-essentials at ${_autoOffTime.format(context)}',
                   onTap: () => _selectTime(context),
                 ),
               ],
             ),
             _buildSection(
               'My Devices',
-              devices.map((device) => SettingTile(
-                icon: Icons.devices_other_rounded,
-                title: device.name,
-                subtitle: '${device.wattage} W - ${device.priority.toString().split('.').last}',
-                onTap: () => showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (context) => DeviceEditDialog(device: device),
-                ),
-              )).toList(),
+              devices
+                  .map((device) => SettingTile(
+                        icon: Icons.devices_other_rounded,
+                        title: device.name,
+                        subtitle:
+                            '${device.wattage} W - ${device.priority.toString().split('.').last}',
+                        onTap: () => showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => DeviceEditDialog(device: device),
+                        ),
+                      ))
+                  .toList(),
             ),
             _buildSection(
               'System',
@@ -269,8 +272,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     decoration: BoxDecoration(
                       color: Colors.orange.withAlpha(30),
                       borderRadius: BorderRadius.circular(10),
-                      border:
-                          Border.all(color: Colors.orange.withAlpha(80)),
+                      border: Border.all(color: Colors.orange.withAlpha(80)),
                     ),
                     child: const Text(
                       'تجريبي',
@@ -296,8 +298,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   title: 'Language',
                   subtitle: language == AppLanguage.en ? 'English' : 'العربية',
                   onTap: () {
-                    ref.read(languageProvider.notifier).state = 
-                      language == AppLanguage.en ? AppLanguage.ar : AppLanguage.en;
+                    ref.read(languageProvider.notifier).state =
+                        language == AppLanguage.en
+                            ? AppLanguage.ar
+                            : AppLanguage.en;
                   },
                 ),
                 const SettingTile(

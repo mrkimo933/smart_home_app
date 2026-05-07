@@ -3,7 +3,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/devices_provider.dart';
-import '../../providers/mqtt_provider.dart';
+import '../../providers/esp_provider.dart';
 import '../../services/notification_service.dart';
 import 'electricity_calculator.dart';
 import '../../models/device.dart';
@@ -22,12 +22,13 @@ final relaySyncListenerProvider = Provider<void>((ref) {
       final devicesNotifier = ref.read(devicesProvider.notifier);
 
       for (final entry in relayMap.entries) {
-        final relayId = entry.key;
+        // relayMap keys are 0-based (from ESP); Device.relayId is 1-based
+        final espIndex = entry.key;
+        final relayId = espIndex + 1; // convert to 1-based
         final isOn = entry.value;
         try {
           final device = devices.firstWhere((d) => d.relayId == relayId);
           if (device.isOn != isOn) {
-            // Immediately update state — no debounce, so power reads 0 at once
             devicesNotifier.toggleDevice(device.relayId, isOn);
             if (isOn) {
               deviceOnTimers[device.id] = DateTime.now();
@@ -55,7 +56,6 @@ final relaySyncListenerProvider = Provider<void>((ref) {
 
   // ── Voltage status: Feature 5 ──────────────────────────────────────────────
   ref.listen<VoltageStatus>(voltageStatusProvider, (previous, next) {
-    // Only act on genuine status transitions
     if (previous == next) return;
 
     final voltage = ref.read(sensorDataProvider).value?.voltage ?? 0.0;
@@ -94,7 +94,7 @@ final relaySyncListenerProvider = Provider<void>((ref) {
   periodicTimer = Timer.periodic(const Duration(minutes: 1), (_) {
     final now = DateTime.now();
     final devices = ref.read(devicesProvider);
-    final mqttService = ref.read(mqttServiceProvider);
+    final espService = ref.read(httpEspServiceProvider);
 
     for (final device in devices) {
       if (!device.isOn) continue;
@@ -103,7 +103,8 @@ final relaySyncListenerProvider = Provider<void>((ref) {
       if (device.timerMinutes != null && device.timerStartTime != null) {
         final elapsed = now.difference(device.timerStartTime!).inMinutes;
         if (elapsed >= device.timerMinutes!) {
-          mqttService.publishRelayCommand(device.relayId, false);
+          // relayId is 1-based; publishRelayCommand converts internally
+          espService.publishRelayCommand(device.relayId, false);
           final isRunByBudget = device.runBudgetEGP != null;
           final budget = device.runBudgetEGP;
           ref.read(devicesProvider.notifier).clearDeviceTimer(device.id);
@@ -115,7 +116,7 @@ final relaySyncListenerProvider = Provider<void>((ref) {
         }
       }
 
-      // Long-usage warning (existing, fires every 3 hours)
+      // Long-usage warning (fires every 3 hours)
       final startTime = deviceOnTimers[device.id];
       if (startTime != null) {
         final duration = now.difference(startTime);
@@ -143,10 +144,8 @@ void _checkOvercurrent(
   Ref ref,
   NotificationService notificationService,
 ) {
-  // Compare total house current against the house breaker limit
   const threshold = kHouseBreakerAmps * 1.1; // 10% tolerance
   if (data.current > threshold) {
-    // Find the highest-wattage non-essential device to disconnect first
     final onDevices = devices.where((d) => d.isOn).toList()
       ..sort((a, b) => b.wattage.compareTo(a.wattage));
 
@@ -159,12 +158,10 @@ void _checkOvercurrent(
     );
 
     if (targetDevice != null) {
-      // Auto-disconnect highest-wattage device
-      ref.read(mqttServiceProvider).publishRelayCommand(targetDevice.relayId, false);
+      ref.read(httpEspServiceProvider).publishRelayCommand(targetDevice.relayId, false);
       ref.read(devicesProvider.notifier).toggleDevice(targetDevice.relayId, false);
     }
 
-    // Log incident
     ref.read(databaseServiceProvider).logOvercurrentIncident(
           deviceId: targetDevice?.id ?? 0,
           deviceName: targetDevice?.name ?? 'House',
@@ -186,7 +183,6 @@ void _checkDeviceBudgets(
     final budget = device.monthlyBudgetEGP;
     if (budget == null || budget <= 0) continue;
 
-    // Estimate monthly cost from today's usage × 30 days
     final dailyKwh =
         device.wattage * (device.totalOnMinutesToday / 60.0) / 1000.0;
     final monthlyCostEstimate =
@@ -197,7 +193,7 @@ void _checkDeviceBudgets(
           device.name, monthlyCostEstimate, budget);
 
       if (device.autoOffOnBudget) {
-        ref.read(mqttServiceProvider).publishRelayCommand(device.relayId, false);
+        ref.read(httpEspServiceProvider).publishRelayCommand(device.relayId, false);
         ref.read(devicesProvider.notifier).toggleDevice(device.relayId, false);
         notificationService.sendDeviceAutoOffBudget(device.name);
       }
@@ -210,10 +206,10 @@ void _checkDeviceBudgets(
 void _autoDisconnectNonEssential(
     Ref ref, NotificationService notificationService) {
   final devices = ref.read(devicesProvider);
-  final mqttService = ref.read(mqttServiceProvider);
+  final espService = ref.read(httpEspServiceProvider);
   for (final device in devices) {
     if (device.isOn && device.priority == DevicePriority.nonEssential) {
-      mqttService.publishRelayCommand(device.relayId, false);
+      espService.publishRelayCommand(device.relayId, false);
       ref.read(devicesProvider.notifier).toggleDevice(device.relayId, false);
     }
   }

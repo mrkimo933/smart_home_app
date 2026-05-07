@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../models/device.dart';
-import '../../../providers/mqtt_provider.dart';
+import '../../../providers/esp_provider.dart';
 import '../../../providers/devices_provider.dart';
 import '../../../core/utils/electricity_calculator.dart';
 import 'device_edit_dialog.dart';
@@ -98,7 +98,7 @@ class DeviceCard extends ConsumerWidget {
                 OutlinedButton.icon(
                   onPressed: () {
                     ref
-                        .read(mqttServiceProvider)
+                        .read(httpEspServiceProvider)
                         .publishRelayCommand(device.relayId, false);
                     ref
                         .read(devicesProvider.notifier)
@@ -199,7 +199,7 @@ class DeviceCard extends ConsumerWidget {
   }
 
   void _applyTimer(WidgetRef ref, int minutes) {
-    ref.read(mqttServiceProvider).publishRelayCommand(device.relayId, true);
+    ref.read(httpEspServiceProvider).publishRelayCommand(device.relayId, true);
     ref.read(devicesProvider.notifier).setDeviceTimer(device.id, minutes);
   }
 
@@ -311,7 +311,7 @@ class DeviceCard extends ConsumerWidget {
                         final budget = double.parse(controller.text);
                         final minutes = (previewHours! * 60).round();
                         ref
-                            .read(mqttServiceProvider)
+                            .read(httpEspServiceProvider)
                             .publishRelayCommand(device.relayId, true);
                         ref
                             .read(devicesProvider.notifier)
@@ -501,8 +501,8 @@ class DeviceCard extends ConsumerWidget {
                           onTap: isMqttConnected
                               ? () {
                                   ref
-                                      .read(mqttControllerProvider)
-                                      .toggleRelay(device.relayId, !active);
+                                      .read(httpEspServiceProvider)
+                                      .publishRelayCommand(device.relayId, !active);
                                   ref
                                       .read(devicesProvider.notifier)
                                       .toggleDevice(device.relayId, !active);

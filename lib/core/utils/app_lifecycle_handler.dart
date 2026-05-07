@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/mqtt_provider.dart';
+import '../../providers/esp_provider.dart';
 
 class AppLifecycleHandler extends WidgetsBindingObserver {
   final WidgetRef ref;
@@ -12,8 +12,8 @@ class AppLifecycleHandler extends WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Reconnect MQTT if needed
-      ref.read(mqttServiceProvider).connect();
+      // Re-initialise HTTP ESP polling when app resumes
+      ref.read(httpEspServiceProvider); // ensure service is alive
     } else if (state == AppLifecycleState.paused) {
       // Could keep alive or perform cleanup
     }

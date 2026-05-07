@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../providers/devices_provider.dart';
-import '../../../providers/mqtt_provider.dart';
+import '../../../providers/esp_provider.dart';
 import '../../../models/device.dart';
 import '../widgets/device_card.dart';
 import '../widgets/device_edit_dialog.dart';

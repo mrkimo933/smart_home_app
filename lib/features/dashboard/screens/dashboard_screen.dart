@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import 'dart:async';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../../providers/mqtt_provider.dart';
+import '../../../providers/esp_provider.dart';
 import '../../../providers/devices_provider.dart';
 import '../../../models/device.dart';
 import '../../../services/simulation_service.dart';
@@ -249,7 +249,7 @@ class DashboardScreen extends ConsumerWidget {
           const Text('Last updated few moments ago', style: TextStyle(color: AppColors.textSecondary)),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: () => ref.read(mqttServiceProvider).connect(),
+            onPressed: () => ref.read(espInitProvider),
             child: const Text('Retry Connection'),
           ),
         ],
@@ -398,7 +398,7 @@ class DashboardScreen extends ConsumerWidget {
                     value: device.isOn,
                     activeThumbColor: AppColors.primaryBlue,
                     onChanged: isConnected ? (val) {
-                      ref.read(mqttControllerProvider).toggleRelay(device.relayId, val);
+                      ref.read(httpEspServiceProvider).publishRelayCommand(device.relayId, val);
                       ref.read(devicesProvider.notifier).toggleDevice(device.relayId, val);
                     } : null,
                   ),

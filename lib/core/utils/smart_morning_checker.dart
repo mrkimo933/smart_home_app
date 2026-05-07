@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/devices_provider.dart';
-import '../../providers/mqtt_provider.dart';
+import '../../providers/esp_provider.dart';
 import '../../services/notification_service.dart';
 
 final smartMorningProvider = Provider<void>((ref) {
@@ -82,7 +82,7 @@ void turnOffAllLamps(WidgetRef ref) {
   final mqtt = ref.read(mqttControllerProvider);
   for (final d in devices) {
     if ((d.icon == 'lamp' || d.icon == 'lightbulb') && d.isOn) {
-      mqtt.toggleRelay(d.relayId, false);
+      mqtt.publishRelayCommand(d.relayId, false);
       ref.read(devicesProvider.notifier).toggleDevice(d.relayId, false);
     }
   }
@@ -94,7 +94,7 @@ void turnOffAllAc(WidgetRef ref) {
   final mqtt = ref.read(mqttControllerProvider);
   for (final d in devices) {
     if (d.icon.toLowerCase().contains('ac') && d.isOn) {
-      mqtt.toggleRelay(d.relayId, false);
+      mqtt.publishRelayCommand(d.relayId, false);
       ref.read(devicesProvider.notifier).toggleDevice(d.relayId, false);
     }
   }
@@ -106,7 +106,7 @@ void turnOffAllDevices(WidgetRef ref) {
   final mqtt = ref.read(mqttControllerProvider);
   for (final d in devices) {
     if (d.isOn) {
-      mqtt.toggleRelay(d.relayId, false);
+      mqtt.publishRelayCommand(d.relayId, false);
       ref.read(devicesProvider.notifier).toggleDevice(d.relayId, false);
     }
   }

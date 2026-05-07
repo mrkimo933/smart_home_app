@@ -5,7 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../models/device.dart';
 import '../../../models/schedule.dart';
 import '../../../providers/devices_provider.dart';
-import '../../../providers/mqtt_provider.dart';
+import '../../../providers/esp_provider.dart';
 import '../../../services/database_service.dart';
 import '../widgets/schedule_card.dart';
 
@@ -44,10 +44,10 @@ class _SchedulesScreenState extends ConsumerState<SchedulesScreen> {
 
   Future<void> _checkAndExecuteSchedules() async {
     final schedules = await ref.read(schedulesProvider.future);
-    final mqtt = ref.read(mqttControllerProvider);
+    final espService = ref.read(httpEspServiceProvider);
     final now = DateTime.now();
     final currentTime = TimeOfDay(hour: now.hour, minute: now.minute);
-    
+
     // Day index: DateTime.weekday (1=Mon, ..., 7=Sun) -> our repeatDays uses (0=Mon, ..., 6=Sun)
     final dayIndex = now.weekday - 1;
 
@@ -55,17 +55,17 @@ class _SchedulesScreenState extends ConsumerState<SchedulesScreen> {
       if (!schedule.isEnabled) continue;
 
       // Check ON trigger
-      if (schedule.repeatDays[dayIndex] && 
-          schedule.onTime.hour == currentTime.hour && 
+      if (schedule.repeatDays[dayIndex] &&
+          schedule.onTime.hour == currentTime.hour &&
           schedule.onTime.minute == currentTime.minute) {
-        mqtt.toggleRelay(schedule.deviceId, true);
+        espService.publishRelayCommand(schedule.deviceId, true);
       }
 
       // Check OFF trigger
       if (schedule.repeatDays[dayIndex] &&
           schedule.offTime.hour == currentTime.hour &&
           schedule.offTime.minute == currentTime.minute) {
-        mqtt.toggleRelay(schedule.deviceId, false);
+        espService.publishRelayCommand(schedule.deviceId, false);
       }
     }
   }

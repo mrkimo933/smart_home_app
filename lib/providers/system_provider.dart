@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // import 'package:shared_preferences/shared_preferences.dart';
 // import 'package:intl/intl.dart';
 import 'devices_provider.dart';
-import 'mqtt_provider.dart';
+import 'esp_provider.dart';
 // import 'consumption_provider.dart';
 import '../services/notification_service.dart';
 // import '../core/utils/electricity_calculator.dart';
@@ -49,7 +49,7 @@ final systemProvider = Provider<void>((ref) {
         if (now.hour >= 23 || now.hour < 6) {
           for (final device in devices) {
             if (device.isOn && (device.priority == DevicePriority.nonEssential || device.icon == 'lamp' || device.icon == 'tv')) {
-              mqtt.toggleRelay(device.relayId, false);
+              mqtt.publishRelayCommand(device.relayId, false);
             }
           }
         }
@@ -58,7 +58,7 @@ final systemProvider = Provider<void>((ref) {
         for (final device in devices) {
           final isHighPower = device.icon.toLowerCase().contains("ac") || device.icon.toLowerCase().contains("heater");
           if (isHighPower && device.isOn && device.totalOnMinutesToday > 240) {
-            mqtt.toggleRelay(device.relayId, false);
+            mqtt.publishRelayCommand(device.relayId, false);
             NotificationService().showNotification(
               id: 9,
               title: 'Auto Saving 🌿',
@@ -72,7 +72,7 @@ final systemProvider = Provider<void>((ref) {
         if (totalActivePower > 5000) {
            for (final device in devices) {
              if (device.isOn && device.priority == DevicePriority.nonEssential) {
-               mqtt.toggleRelay(device.relayId, false);
+               mqtt.publishRelayCommand(device.relayId, false);
                NotificationService().showNotification(
                   id: 10,
                   title: 'Load Balancing ⚡',

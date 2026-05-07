@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../models/device.dart';
 import '../../../providers/devices_provider.dart';
-import '../../../providers/mqtt_provider.dart';
+import '../../../providers/esp_provider.dart';
 import '../../../services/notification_service.dart';
 
 class QuickActionsBar extends ConsumerWidget {
@@ -134,10 +134,10 @@ class QuickActionsBar extends ConsumerWidget {
 
   void _turnOffAll(WidgetRef ref) {
     final devices = ref.read(devicesProvider);
-    final mqtt = ref.read(mqttControllerProvider);
+    final espService = ref.read(httpEspServiceProvider);
     for (final d in devices) {
       if (d.isOn) {
-        mqtt.toggleRelay(d.relayId, false);
+        espService.publishRelayCommand(d.relayId, false);
         ref.read(devicesProvider.notifier).toggleDevice(d.relayId, false);
       }
     }
@@ -150,10 +150,10 @@ class QuickActionsBar extends ConsumerWidget {
 
   void _essentialOnly(WidgetRef ref) {
     final devices = ref.read(devicesProvider);
-    final mqtt = ref.read(mqttControllerProvider);
+    final espService = ref.read(httpEspServiceProvider);
     for (final d in devices) {
       if (d.isOn && d.priority != DevicePriority.essential) {
-        mqtt.toggleRelay(d.relayId, false);
+        espService.publishRelayCommand(d.relayId, false);
         ref.read(devicesProvider.notifier).toggleDevice(d.relayId, false);
       }
     }
@@ -166,10 +166,10 @@ class QuickActionsBar extends ConsumerWidget {
 
   void _nightMode(WidgetRef ref) {
     final devices = ref.read(devicesProvider);
-    final mqtt = ref.read(mqttControllerProvider);
+    final espService = ref.read(httpEspServiceProvider);
     for (final d in devices) {
       if (d.isOn && d.priority != DevicePriority.essential) {
-        mqtt.toggleRelay(d.relayId, false);
+        espService.publishRelayCommand(d.relayId, false);
         ref.read(devicesProvider.notifier).toggleDevice(d.relayId, false);
       }
     }

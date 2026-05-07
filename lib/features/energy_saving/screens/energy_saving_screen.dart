@@ -6,7 +6,7 @@ import '../../../providers/devices_provider.dart';
 import '../../../core/utils/electricity_calculator.dart';
 import '../../../models/device.dart';
 import '../../../providers/consumption_provider.dart';
-import '../../../providers/mqtt_provider.dart';
+import '../../../providers/esp_provider.dart';
 import '../../../services/notification_service.dart';
 import '../widgets/device_priority_card.dart';
 
@@ -42,11 +42,11 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
 
   Future<void> _performAutoShutdown() async {
     final devices = ref.read(devicesProvider);
-    final mqtt = ref.read(mqttControllerProvider);
+    final espService = ref.read(httpEspServiceProvider);
     bool acted = false;
     for (var device in devices) {
       if (device.priority == DevicePriority.nonEssential && device.isOn) {
-        mqtt.toggleRelay(device.relayId, false);
+        espService.publishRelayCommand(device.relayId, false);
         acted = true;
       }
     }
@@ -67,10 +67,10 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
     final minute = int.parse(timeStr.split(':')[1]);
     if (now.hour == hour && now.minute == minute) {
       final devices = ref.read(devicesProvider);
-      final mqtt = ref.read(mqttControllerProvider);
+      final espService = ref.read(httpEspServiceProvider);
       for (var device in devices) {
         if (device.icon.toLowerCase() == 'lamp' && device.isOn) {
-          mqtt.toggleRelay(device.relayId, false);
+          espService.publishRelayCommand(device.relayId, false);
         }
       }
     }
@@ -499,15 +499,15 @@ class _EnergySavingScreenState extends ConsumerState<EnergySavingScreen> {
                   final minutes = (entry.value * 60).toInt();
                   if (minutes > 0) {
                     ref
-                        .read(mqttControllerProvider)
-                        .toggleRelay(entry.key.relayId, true);
+                        .read(httpEspServiceProvider)
+                        .publishRelayCommand(entry.key.relayId, true);
                     ref
                         .read(devicesProvider.notifier)
                         .setDeviceTimer(entry.key.id, minutes);
                   } else {
                     ref
-                        .read(mqttControllerProvider)
-                        .toggleRelay(entry.key.relayId, false);
+                        .read(httpEspServiceProvider)
+                        .publishRelayCommand(entry.key.relayId, false);
                     ref
                         .read(devicesProvider.notifier)
                         .toggleDevice(entry.key.relayId, false);

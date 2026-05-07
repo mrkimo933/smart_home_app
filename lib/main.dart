@@ -14,6 +14,7 @@ import 'services/notification_service.dart';
 import 'core/constants/app_strings.dart';
 import 'providers/system_provider.dart';
 import 'providers/consumption_provider.dart';
+import 'providers/esp_provider.dart';
 import 'core/utils/app_lifecycle_handler.dart';
 import 'core/utils/relay_sync_listener.dart';
 import 'core/utils/smart_morning_checker.dart';
@@ -65,6 +66,7 @@ class _MyAppState extends ConsumerState<MyApp> {
     // Register all background providers once — safe to do in initState
     Future.microtask(() {
       if (!mounted) return;
+      try { ref.read(espInitProvider); } catch (_) {}
       try { ref.read(relaySyncListenerProvider); } catch (_) {}
       try { ref.read(houseBudgetAlertProvider); } catch (_) {}
       try { ref.read(systemProvider); } catch (_) {}
