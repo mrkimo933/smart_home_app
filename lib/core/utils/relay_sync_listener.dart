@@ -186,9 +186,6 @@ const double kOverloadTolerance = 1.10;
 /// How long to ignore repeated trips on the same device (anti-spam).
 const Duration kPerDeviceCooldown = Duration(seconds: 30);
 
-/// Full blackout cooldown after a short-circuit event — don't re-arm for 60s.
-const Duration kShortCircuitCooldown = Duration(seconds: 60);
-
 // ── Smart Protection Engine ────────────────────────────────────────────────
 // A stateful singleton that lives for the lifetime of the provider.
 // Tracks per-device trip timestamps + a global short-circuit lock.
@@ -196,9 +193,6 @@ const Duration kShortCircuitCooldown = Duration(seconds: 60);
 class _SmartProtectionEngine {
   /// Last trip timestamp per device ID.
   final Map<int, DateTime> _deviceTripTimes = {};
-
-  /// When the last short-circuit ALL-OFF was triggered.
-  DateTime? _lastShortCircuitAt;
 
   /// Prevent re-entrant calls while we are still sending HTTP requests.
   bool _handling = false;
@@ -250,15 +244,7 @@ class _SmartProtectionEngine {
     required NotificationService notificationService,
   }) async {
     final now = DateTime.now();
-
-    // Cooldown guard — do not re-trigger within 60 s of last short-circuit.
-    if (_lastShortCircuitAt != null &&
-        now.difference(_lastShortCircuitAt!) < kShortCircuitCooldown) {
-      return;
-    }
-
     _handling = true;
-    _lastShortCircuitAt = now;
 
     // Identify the most likely culprit:
     // The device with the highest rated current that is currently ON.
