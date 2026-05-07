@@ -47,6 +47,7 @@ class AiScenarioService {
     required double budgetEGP,
     required int currentDay,
     required double currentKwh,
+    required double currentCostEGP,
     required List<Device> devices,
   }) async {
     final apiKey = await getApiKey();
@@ -55,48 +56,70 @@ class AiScenarioService {
     }
 
     final deviceList = devices
-        .map((d) =>
-            '${d.name}: ${d.wattage}W, priority: ${d.priority.name}')
+        .map((d) => '- ${d.name}: ${d.wattage}W, أولوية: ${d.priority.name}')
         .join('\n');
 
-    final userContent = '''Monthly budget: $budgetEGP EGP.
-Current consumption: ${currentKwh.toStringAsFixed(2)} kWh on day $currentDay of the month.
-Devices:
+    final userContent = '''المستخدم لديه ميزانية شهرية: $budgetEGP جنيه مصري
+
+اليوم: $currentDay من الشهر
+الاستهلاك حتى الآن: ${currentKwh.toStringAsFixed(2)} كيلوواط/ساعة
+التكلفة حتى الآن: ${currentCostEGP.toStringAsFixed(2)} جنيه
+
+أجهزته:
 $deviceList
 
-Egyptian electricity tiers: 0-50=0.41, 51-100=0.71, 101-200=1.01, 201-350=1.61, 351-650=1.85 EGP/kWh
+شرائح أسعار الكهرباء المصرية 2024:
+- 0 إلى 50 كيلوواط = 0.41 جنيه/كيلوواط
+- 51 إلى 100 كيلوواط = 0.71 جنيه/كيلوواط
+- 101 إلى 200 كيلوواط = 1.01 جنيه/كيلوواط
+- 201 إلى 350 كيلوواط = 1.61 جنيه/كيلوواط
+- 351 إلى 650 كيلوواط = 1.85 جنيه/كيلوواط
+- 651 إلى 1000 كيلوواط = 2.15 جنيه/كيلوواط
+- أكثر من 1000 كيلوواط = 2.35 جنيه/كيلوواط
 
-Return ONLY a JSON array of exactly 3 scenarios (no extra text, no markdown):
+بناءً على هذه البيانات الحقيقية، اقترح 3 خطط:
+1. توفير أقصى - أقل تكلفة ممكنة
+2. توازن - راحة مع توفير
+3. راحة - أقصى راحة في حدود الميزانية
+
+أعد JSON فقط بهذا الشكل بالضبط:
 [
   {
     "name": "توفير أقصى",
     "emoji": "💰",
-    "description": "description in Arabic",
-    "predictedCost": 450.0,
-    "savingsEGP": 50.0,
+    "description": "وصف مختصر للخطة",
+    "predictedMonthlyCost": 450.0,
+    "savingsEGP": 150.0,
+    "withinBudget": true,
     "devices": [
       {
         "deviceName": "AC",
         "hoursPerDay": 4.0,
-        "timeSlot": "9PM-1AM"
+        "bestTimeSlot": "10م - 2ص",
+        "monthlyCost": 280.0
       }
-    ]
+    ],
+    "tips": "نصيحة مختصرة للمستخدم"
   },
   {
     "name": "توازن",
     "emoji": "⚖️",
     "description": "...",
-    "predictedCost": 480.0,
-    "savingsEGP": 20.0,
-    "devices": []
+    "predictedMonthlyCost": 500.0,
+    "savingsEGP": 100.0,
+    "withinBudget": true,
+    "devices": [],
+    "tips": "..."
   },
   {
     "name": "راحة",
     "emoji": "😊",
     "description": "...",
-    "predictedCost": 510.0,
+    "predictedMonthlyCost": 600.0,
     "savingsEGP": 0.0,
-    "devices": []
+    "withinBudget": false,
+    "devices": [],
+    "tips": "..."
   }
 ]''';
 
@@ -121,7 +144,7 @@ Return ONLY a JSON array of exactly 3 scenarios (no extra text, no markdown):
             {
               'role': 'system',
               'content':
-                  'You are an energy saving assistant for Egyptian homes. Always respond with valid JSON only, no extra text, no markdown code blocks.',
+                  'أنت مساعد ذكي متخصص في ترشيد استهلاك الكهرباء في مصر. تعرف جيداً شرائح أسعار الكهرباء المصرية وعادات المستهلك المصري. دائماً ترد بـ JSON فقط بدون أي نص إضافي.',
             },
             {
               'role': 'user',
