@@ -59,4 +59,26 @@ class EnergyScenario {
             [],
         tips: json['tips'] as String? ?? '',
       );
+
+  EnergyScenario copyWith({
+    String? name,
+    String? emoji,
+    String? description,
+    double? predictedMonthlyCost,
+    double? savingsEGP,
+    bool? withinBudget,
+    List<ScenarioDevice>? devices,
+    String? tips,
+  }) {
+    return EnergyScenario(
+      name: name ?? this.name,
+      emoji: emoji ?? this.emoji,
+      description: description ?? this.description,
+      predictedMonthlyCost: predictedMonthlyCost ?? this.predictedMonthlyCost,
+      savingsEGP: savingsEGP ?? this.savingsEGP,
+      withinBudget: withinBudget ?? this.withinBudget,
+      devices: devices ?? this.devices,
+      tips: tips ?? this.tips,
+    );
+  }
 }

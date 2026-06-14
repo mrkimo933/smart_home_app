@@ -43,37 +43,120 @@ class AiScenarioService {
     }
   }
 
-  String _getDeviceNature(String deviceName) {
-    final name = deviceName.toLowerCase();
-    if (name.contains('fridge') || name.contains('refrigerator') || name.contains('ثلاجة')) {
-      return 'تشتغل 24 ساعة دايماً - ما تتوقفش أبداً - hoursPerDay يكون 24';
+  // ── Egyptian electricity pricing tiers ──────────────────────────────────
+
+  double _calculateMonthlyCost(double kwh) {
+    double cost = 0;
+    double remaining = kwh;
+
+    const tiers = [
+      (50.0, 0.41),
+      (50.0, 0.71),
+      (100.0, 1.01),
+      (150.0, 1.61),
+      (300.0, 1.85),
+      (350.0, 2.15),
+      (double.infinity, 2.35),
+    ];
+
+    for (final (limit, rate) in tiers) {
+      final used = remaining <= limit ? remaining : limit;
+      cost += used * rate;
+      remaining -= used;
+      if (remaining <= 0) break;
     }
-    if (name.contains('ac') || name.contains('air') || name.contains('condition') || name.contains('تكييف')) {
-      return 'تكييف - يحتاج 6-10 ساعات يومياً في الصيف المصري - مش ساعة واحدة - أكفأ وقت الليل';
-    }
-    if (name.contains('heater') || name.contains('سخان') || name.contains('water heater')) {
-      return 'سخان مياه - يكفيه 45 دقيقة (0.75 ساعة) يومياً قبل الاستحمام - مش ساعتين';
-    }
-    if (name.contains('wash') || name.contains('غسالة')) {
-      return 'غسالة - 3-4 مرات أسبوعياً، كل مرة 1.5 ساعة، معدل يومي = 0.64 ساعة';
-    }
-    if (name.contains('tv') || name.contains('تلفزيون') || name.contains('شاشة')) {
-      return 'تلفزيون - 3-5 ساعات يومياً مساءً';
-    }
-    if (name.contains('lamp') || name.contains('light') || name.contains('نور') || name.contains('إضاءة') || name.contains('لمبة')) {
-      return 'إضاءة - 5-8 ساعات يومياً من 6م لحد 12م';
-    }
-    if (name.contains('computer') || name.contains('laptop') || name.contains('كمبيوتر') || name.contains('لابتوب')) {
-      return 'كمبيوتر أو لابتوب - 4-8 ساعات يومياً';
-    }
-    if (name.contains('microwave') || name.contains('ميكرويف')) {
-      return 'ميكرويف - استخدام قصير 15-20 دقيقة يومياً';
-    }
-    if (name.contains('iron') || name.contains('مكواة')) {
-      return 'مكواة - مرة أو مرتين أسبوعياً، 30-45 دقيقة';
-    }
-    return 'جهاز عام - قدّر ساعات الاستخدام بناءً على الواتية المذكورة';
+    return cost;
   }
+
+  double _costPerHour(Device device) {
+    return (device.wattage / 1000) * 1.61;
+  }
+
+
+
+
+  // ── Device schedule constraints ──────────────────────────────────────────
+
+  double _getMaxReasonableHours(String name) {
+    final n = name.toLowerCase();
+    if (n.contains('fridge') || n.contains('ثلاجة') || n.contains('refrigerator')) return 24;
+    if (n.contains('ac') || n.contains('air') || n.contains('تكييف')) return 10;
+    if (n.contains('heater') || n.contains('سخان')) return 1;
+    if (n.contains('wash') || n.contains('غسالة')) return 1.5;
+    if (n.contains('tv') || n.contains('تلفزيون')) return 6;
+    if (n.contains('lamp') || n.contains('light') || n.contains('نور') || n.contains('إضاءة')) return 8;
+    if (n.contains('computer') || n.contains('laptop') || n.contains('كمبيوتر')) return 8;
+    if (n.contains('microwave') || n.contains('ميكرويف')) return 0.5;
+    if (n.contains('iron') || n.contains('مكواة')) return 0.5;
+    if (n.contains('coffee') || n.contains('قهوة')) return 0.5;
+    return 6;
+  }
+
+  double _getMinRequiredHours(String name) {
+    final n = name.toLowerCase();
+    if (n.contains('fridge') || n.contains('ثلاجة') || n.contains('refrigerator')) return 24;
+    if (n.contains('ac') || n.contains('air') || n.contains('تكييف')) return 4;
+    if (n.contains('heater') || n.contains('سخان')) return 0.5;
+    if (n.contains('wash') || n.contains('غسالة')) return 0.4;
+    if (n.contains('tv') || n.contains('تلفزيون')) return 2;
+    if (n.contains('lamp') || n.contains('نور') || n.contains('إضاءة')) return 4;
+    return 1;
+  }
+
+  String _getDeviceNature(String deviceName) {
+    final n = deviceName.toLowerCase();
+    if (n.contains('fridge') || n.contains('refrigerator') || n.contains('ثلاجة')) {
+      return 'تشتغل 24 ساعة دايماً — hoursPerDay يكون 24 دايماً';
+    }
+    if (n.contains('ac') || n.contains('air') || n.contains('تكييف')) {
+      return 'تكييف — في الصيف المصري يحتاج 6-10 ساعات — أكفأ وقت الليل (10م-6ص)';
+    }
+    if (n.contains('heater') || n.contains('سخان')) {
+      return 'سخان — يكفيه 45 دقيقة (0.75 ساعة) قبل الاستحمام مباشرة';
+    }
+    if (n.contains('wash') || n.contains('غسالة')) {
+      return 'غسالة — 3-4 مرات أسبوعياً × 1.5 ساعة = معدل يومي 0.6 ساعة';
+    }
+    if (n.contains('tv') || n.contains('تلفزيون')) {
+      return 'تلفزيون — 3-5 ساعات مساءً';
+    }
+    if (n.contains('lamp') || n.contains('نور') || n.contains('إضاءة')) {
+      return 'إضاءة — 5-8 ساعات مساءً من 6م لـ 12م';
+    }
+    if (n.contains('computer') || n.contains('laptop') || n.contains('كمبيوتر')) {
+      return 'كمبيوتر — 4-8 ساعات للعمل أو الدراسة';
+    }
+    if (n.contains('microwave') || n.contains('ميكرويف')) {
+      return 'ميكرويف — استخدامات قصيرة 15-20 دقيقة يومياً';
+    }
+    if (n.contains('coffee') || n.contains('قهوة')) {
+      return 'ماكينة قهوة — 15-30 دقيقة صباحاً';
+    }
+    if (n.contains('iron') || n.contains('مكواة')) {
+      return 'مكواة — مرة أو مرتين أسبوعياً 30 دقيقة';
+    }
+    return 'جهاز عام — قدّر ساعات منطقية بناءً على الواتية';
+  }
+
+  String _buildDeviceContext(List<Device> devices) {
+    final sb = StringBuffer();
+    for (final d in devices) {
+      final costPerHour = _costPerHour(d);
+      final nature = _getDeviceNature(d.name);
+      final maxH = _getMaxReasonableHours(d.name);
+      final minH = _getMinRequiredHours(d.name);
+      sb.writeln(
+        '- ${d.name} | ${d.wattage}W | '
+        'تكلفة الساعة الواحدة: ${costPerHour.toStringAsFixed(2)} جنيه | '
+        'أقل ساعات: $minH س/يوم | '
+        'أقصى ساعات معقولة: $maxH س/يوم | '
+        'طبيعة: $nature',
+      );
+    }
+    return sb.toString();
+  }
+
+  // ── Public entry point ───────────────────────────────────────────────────
 
   Future<List<EnergyScenario>> generateScenarios({
     required double budgetEGP,
@@ -87,68 +170,67 @@ class AiScenarioService {
       throw Exception('NO_API_KEY');
     }
 
-    final deviceContext = devices.map((d) {
-      final nature = _getDeviceNature(d.name);
-      return '- ${d.name} | ${d.wattage}W | أولوية: ${d.priority.name} | طبيعة: $nature';
-    }).join('\n');
+    final deviceContext = _buildDeviceContext(devices);
+
+    // Pre-calculate baseline cost (minimum usage scenario)
+    double baselineKwh = 0;
+    for (final d in devices) {
+      baselineKwh += (d.wattage / 1000) * _getMinRequiredHours(d.name) * 30;
+    }
+    final baselineCost = _calculateMonthlyCost(baselineKwh);
 
     final userContent = '''
-أنت مستشار طاقة خبير للمنازل المصرية. فكّر كأنك إنسان بيخطط ميزانية كهرباء شهرية لأسرة مصرية.
+أنت مخطط جداول كهرباء للمنازل المصرية. مهمتك فقط: قرر كل جهاز يشتغل كام ساعة في اليوم وامتى.
 
-معلومات المستخدم:
+⚠️ مهم جداً: أنت لا تحسب التكاليف — التكاليف محسوبة ليك بالفعل. فقط اقرر الجداول.
+
+معلومات المنزل:
 - الميزانية الشهرية: $budgetEGP جنيه
-- اليوم الحالي من الشهر: $currentDay
-- الاستهلاك الحالي هذا الشهر: ${currentKwh.toStringAsFixed(2)} كيلوواط/ساعة
-- التكلفة المصروفة حتى الآن: ${currentCostEGP.toStringAsFixed(2)} جنيه
+- اليوم الحالي: $currentDay من الشهر
+- الاستهلاك الحالي: ${currentKwh.toStringAsFixed(2)} كيلوواط/ساعة
+- المصروف حتى الآن: ${currentCostEGP.toStringAsFixed(2)} جنيه
+- الحد الأدنى لتكلفة كل الأجهزة (بأقل استخدام): ${baselineCost.toStringAsFixed(0)} جنيه/شهر
 
-الأجهزة الموجودة في البيت:
+الأجهزة مع تكلفة كل ساعة تشغيل:
 $deviceContext
+مهمتك: اعمل 3 خطط — نفس الميزانية ($budgetEGP جنيه) في كل خطة، بس أسلوب تشغيل مختلف:
 
-مهمتك: اعمل 3 خطط تشغيل مختلفة.
+خطة 1 - "جدول الليل" 🌙
+  الأجهزة الثقيلة تشتغل بالليل (10م-6ص)
+  فكرة: استغل برودة الليل للتكييف، اعمل الغسيل بالليل
 
-⚠️ قاعدة أساسية لا تنكسر: كل خطة لازم تكلف بين 90% و100% من الميزانية ($budgetEGP جنيه).
-الفرق بين الخطط هو أسلوب التشغيل (إمتى وإزاي) — مش السعر.
+خطة 2 - "جدول الصبح" ☀️
+  الأجهزة الثقيلة تشتغل الصبح (6ص-2م)
+  فكرة: خلّص كل حاجة قبل السخونة، ارتاح بالليل
 
-الخطة 1 - "جدول الليل" 🌙
-  شغّل الأجهزة الثقيلة بالليل (تكييف من 10م لـ6ص، غسالة 11م، سخان 5:30ص).
-  استغل الجو البارد بالليل لتشغيل أكفأ.
+خطة 3 - "جدول حر" 🕐
+  كل جهاز له حد أقصى من الساعات اليومية يضمن الميزانية
+  فكرة: استخدم وقت ما تحب بس في الحدود المكتوبة
 
-الخطة 2 - "جدول الصبح" ☀️
-  خلّص الأعمال الثقيلة الصبح بدري (تكييف من 6ص لـ2م، غسالة 9ص، سخان 6ص).
-  ارتاح بالليل.
+قواعد اختيار الساعات:
+1. الثلاجة دايماً 24 ساعة — ثابتة في كل خطة
+2. كل جهاز له "أقل ساعات" و"أقصى ساعات معقولة" مكتوبين فوق — اختر بينهم
+3. بعد ما تحدد الساعات، اضرب: (الواتية/1000) × الساعات × 30 = kWh الجهاز
+4. اجمع كل الـ kWh وتأكد إن التكلفة الإجمالية قريبة من $budgetEGP جنيه
+5. لو التكلفة أقل من ${(budgetEGP * 0.88).toStringAsFixed(0)} جنيه → زيد ساعات الأجهزة غير الأساسية
+6. لو التكلفة أكبر من $budgetEGP جنيه → قلل ساعات الأجهزة غير الأساسية
 
-الخطة 3 - "جدول حر" 🕐
-  استخدم الأجهزة وقت ما تحب، بس احسب أقصى ساعات ممكنة لكل جهاز عشان ميتعداش الميزانية.
+للتذكير: تكلفة kWh حسب الشرائح:
+0-50 kWh = 0.41 جنيه/kWh | 51-100 = 0.71 | 101-200 = 1.01 | 201-350 = 1.61 | 351-650 = 1.85 | 651-1000 = 2.15 | +1000 = 2.35
 
-قواعد الحساب:
-1. الثلاجة دايماً 24 ساعة في اليوم — لا تتغير أبداً
-2. التكييف في الصيف المصري يحتاج 6-10 ساعات يومياً — مش ساعة
-3. السخان يكفيه 45 دقيقة (0.75 ساعة) يومياً — مش ساعتين
-4. الغسالة 3-4 مرات أسبوعياً × 1.5 ساعة = معدل 0.64 ساعة يومياً
-5. لو التكلفة الحسابية أقل من 90% من الميزانية، زيد ساعات الأجهزة غير الأساسية لحد ما تكمل
-6. احسب التكلفة بشرائح الكهرباء المصرية:
-   0-50 كيلوواط = 0.41 جنيه/كيلوواط
-   51-100 = 0.71
-   101-200 = 1.01
-   201-350 = 1.61
-   351-650 = 1.85
-   651-1000 = 2.15
-   أكثر من 1000 = 2.35
-7. لكل جهاز اكتب وقت تشغيل محدد (مثال: "10م - 6ص" مش بس "ليلاً")
-
-أجب فقط بـ JSON array بالتنسيق ده، بدون أي كلام تاني:
+أجب فقط بـ JSON array، بدون أي كلام تاني:
 [
   {
     "name": "جدول الليل",
     "emoji": "🌙",
-    "description": "وصف أسلوب الخطة وليه هي مناسبة",
-    "predictedMonthlyCost": 960.0,
-    "savingsEGP": 40.0,
+    "description": "جملة وصف قصيرة لأسلوب الخطة",
+    "predictedMonthlyCost": 950.0,
+    "savingsEGP": 50.0,
     "withinBudget": true,
     "tips": "نصيحة عملية ومحددة",
     "devices": [
       {
-        "deviceName": "اسم الجهاز زي ما هو مكتوب فوق",
+        "deviceName": "اسم الجهاز كما هو مكتوب بالضبط فوق",
         "hoursPerDay": 8.0,
         "bestTimeSlot": "10م - 6ص",
         "monthlyCost": 320.0
@@ -158,7 +240,49 @@ $deviceContext
 ]
 ''';
 
-    return await _callApi(apiKey, userContent);
+    final rawScenarios = await _callApi(apiKey, userContent);
+
+    // Flutter recalculates real costs from AI's hours + real wattage
+    return rawScenarios.map((scenario) {
+      double totalKwh = 0;
+
+      // First pass: compute each device's kWh from real wattage
+      final deviceKwhMap = <int, double>{};
+      for (int i = 0; i < scenario.devices.length; i++) {
+        final sd = scenario.devices[i];
+        final realDevice = devices.firstWhere(
+          (d) => d.name == sd.deviceName,
+          orElse: () => devices.first,
+        );
+        final monthlyKwh = (realDevice.wattage / 1000) * sd.hoursPerDay * 30;
+        deviceKwhMap[i] = monthlyKwh;
+        totalKwh += monthlyKwh;
+      }
+
+      final totalCost = _calculateMonthlyCost(totalKwh);
+
+      // Second pass: assign per-device cost proportionally
+      final correctedDevices = <ScenarioDevice>[];
+      for (int i = 0; i < scenario.devices.length; i++) {
+        final sd = scenario.devices[i];
+        final deviceKwh = deviceKwhMap[i] ?? 0.0;
+        final deviceCost =
+            totalKwh > 0 ? (deviceKwh / totalKwh) * totalCost : 0.0;
+        correctedDevices.add(ScenarioDevice(
+          deviceName: sd.deviceName,
+          hoursPerDay: sd.hoursPerDay,
+          bestTimeSlot: sd.bestTimeSlot,
+          monthlyCost: deviceCost,
+        ));
+      }
+
+      return scenario.copyWith(
+        predictedMonthlyCost: totalCost,
+        savingsEGP: budgetEGP - totalCost,
+        withinBudget: totalCost <= budgetEGP,
+        devices: correctedDevices,
+      );
+    }).toList();
   }
 
   Future<List<EnergyScenario>> _callApi(
@@ -179,14 +303,14 @@ $deviceContext
             {
               'role': 'system',
               'content':
-                  'أنت مساعد ذكي متخصص في ترشيد استهلاك الكهرباء في مصر. تعرف جيداً شرائح أسعار الكهرباء المصرية وعادات المستهلك المصري. دائماً ترد بـ JSON فقط بدون أي نص إضافي.',
+                  'أنت مساعد ذكي متخصص في جدولة استهلاك الكهرباء في مصر. مهمتك فقط هي تحديد ساعات تشغيل الأجهزة — لا تحسب التكاليف بنفسك. دائماً ترد بـ JSON فقط بدون أي نص إضافي.',
             },
             {
               'role': 'user',
               'content': userContent,
             },
           ],
-          'temperature': 0.7,
+          'temperature': 0.4,
           'max_tokens': 2000,
         }),
       ).timeout(const Duration(seconds: 30));
@@ -200,7 +324,6 @@ $deviceContext
       final content = (responseJson['choices'] as List)
           .first['message']['content'] as String;
 
-      // Clean response — remove possible markdown code fences
       final cleaned = content
           .replaceAll(RegExp(r'```json\s*'), '')
           .replaceAll(RegExp(r'```\s*'), '')
@@ -209,14 +332,11 @@ $deviceContext
       try {
         final list = jsonDecode(cleaned) as List<dynamic>;
         return list
-            .map((e) =>
-                EnergyScenario.fromJson(e as Map<String, dynamic>))
+            .map((e) => EnergyScenario.fromJson(e as Map<String, dynamic>))
             .toList();
       } catch (_) {
-        // Invalid JSON — retry once
         if (retryCount < 1) {
-          return await _callApi(apiKey, userContent,
-              retryCount: retryCount + 1);
+          return await _callApi(apiKey, userContent, retryCount: retryCount + 1);
         }
         throw Exception('INVALID_JSON');
       }
