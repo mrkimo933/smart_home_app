@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/widgets/modern_card.dart';
 import '../../main.dart';
 import '../../providers/esp_provider.dart';
 
@@ -74,24 +75,46 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       body: Stack(
         children: [
           // Main splash content
-          const Center(
+          Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.bolt, size: 80, color: AppColors.primaryBlue),
-                SizedBox(height: 20),
-                Text(
-                  'Smart Home Energy Monitor',
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryBlue.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  child: const Icon(Icons.bolt, size: 72, color: AppColors.primaryBlue),
+                ),
+                const SizedBox(height: 28),
+                const Text(
+                  'Smart Home Energy',
                   style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
                   ),
                 ),
-                SizedBox(height: 40),
-                CircularProgressIndicator(
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
+                const SizedBox(height: 4),
+                const Text(
+                  'Monitor',
+                  style: TextStyle(
+                    color: AppColors.accentOrange,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 48),
+                const SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 4,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
+                  ),
                 ),
               ],
             ),
@@ -100,33 +123,33 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           // IP entry overlay shown when no IP is saved
           if (_showIpDialog)
             Container(
-              color: Colors.black.withAlpha(180),
+              color: Colors.black.withOpacity(0.7),
               child: Center(
-                child: Container(
+                child: ModernCard(
+                  borderRadius: 28,
                   margin: const EdgeInsets.symmetric(horizontal: 32),
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+                  padding: const EdgeInsets.all(28),
+                  backgroundColor: AppColors.cardColor,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Enter ESP32 IP Address',
+                        'Connect to ESP32',
                         style: TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       const Text(
-                        'Enter the IP shown in the Arduino Serial Monitor to connect to your ESP32.',
+                        'Enter the IP address shown in the Arduino Serial Monitor.',
                         style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 13,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       const SizedBox(height: 16),

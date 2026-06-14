@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/widgets/modern_card.dart';
 import '../../../providers/devices_provider.dart';
 import '../../../providers/esp_provider.dart';
 import '../widgets/setting_tile.dart';

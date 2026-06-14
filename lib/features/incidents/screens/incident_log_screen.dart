@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/modern_card.dart';
 import '../../../providers/devices_provider.dart';
 
 final incidentLogProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
@@ -29,15 +30,27 @@ class IncidentLogScreen extends ConsumerWidget {
       ),
       body: incidentsAsync.when(
         data: (incidents) => incidents.isEmpty
-            ? const Center(
+            ? Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check_circle_outline, size: 64, color: AppColors.accentGreen),
-                    SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppColors.successGreen.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(Icons.check_circle_outline, size: 64, color: AppColors.successGreen),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'No overcurrent incidents',
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
                     Text(
-                      'No overcurrent incidents recorded',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+                      'Your system is operating normally',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                     ),
                   ],
                 ),
@@ -57,28 +70,26 @@ class IncidentLogScreen extends ConsumerWidget {
                     parsedTime = DateTime.parse(timestamp);
                   } catch (_) {}
 
-                  return Card(
-                    color: AppColors.cardColor,
+                  return ModernCard(
+                    borderRadius: 18,
                     margin: const EdgeInsets.only(bottom: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: AppColors.errorRed.withAlpha((0.3 * 255).toInt()),
-                      ),
+                    padding: const EdgeInsets.all(14),
+                    backgroundColor: AppColors.cardColor,
+                    border: Border.all(
+                      color: AppColors.errorRed.withOpacity(0.25),
+                      width: 1.5,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppColors.errorRed.withAlpha((0.15 * 255).toInt()),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.electric_bolt, color: AppColors.errorRed, size: 24),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.errorRed.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          const SizedBox(width: 16),
+                          child: const Icon(Icons.electric_bolt, color: AppColors.errorRed, size: 22),
+                        ),
+                        const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
