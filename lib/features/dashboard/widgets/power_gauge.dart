@@ -15,8 +15,8 @@ class PowerGauge extends StatelessWidget {
   });
 
   Color _getGaugeColor(double value) {
-    if (value < 500) return AppColors.accentGreen;
-    if (value < 1500) return Colors.orange;
+    if (value < 500) return AppColors.accentTeal;
+    if (value < 1500) return AppColors.accentOrange;
     return AppColors.errorRed;
   }
 

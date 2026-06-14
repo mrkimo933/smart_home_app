@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/utils/peak_hours_checker.dart';
+import '../../../core/constants/app_colors.dart';
 
 class PeakHoursBanner extends ConsumerStatefulWidget {
   const PeakHoursBanner({super.key});
@@ -55,27 +56,45 @@ class _PeakHoursBannerState extends ConsumerState<PeakHoursBanner>
         final isAfternoon = status == PeakStatus.afternoonPeak;
         final gradient = isAfternoon
             ? const LinearGradient(
-                colors: [Color(0xFFD93025), Color(0xFFFF6B35)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
+                colors: [Color(0xFFEA580C), Color(0xFFD946EF)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               )
             : const LinearGradient(
-                colors: [Color(0xFFFF6B35), Color(0xFFFFAA00)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
+                colors: [Color(0xFF2563EB), Color(0xFF14B8A6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               );
 
         return FadeTransition(
           opacity: _fadeAnim,
           child: Container(
             width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(gradient: gradient),
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              gradient: gradient,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: isAfternoon ? Colors.orange.withOpacity(0.3) : Colors.blue.withOpacity(0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
             child: Row(
               children: [
-                const Text('⚡', style: TextStyle(fontSize: 18)),
-                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text('⚡', style: TextStyle(fontSize: 20)),
+                ),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,23 +104,26 @@ class _PeakHoursBannerState extends ConsumerState<PeakHoursBanner>
                         'وقت الذروة - الاستهلاك العالي الآن',
                         style: TextStyle(
                           color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          letterSpacing: 0.5,
                         ),
                       ),
+                      const SizedBox(height: 4),
                       Text(
                         PeakHoursChecker.peakEndTimeAr(),
                         style: TextStyle(
-                          color: Colors.white.withAlpha(200),
-                          fontSize: 11,
+                          color: Colors.white.withOpacity(0.85),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white, size: 18),
-                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                  padding: const EdgeInsets.all(8),
                   constraints: const BoxConstraints(),
                   onPressed: () => setState(() => _dismissed = true),
                 ),

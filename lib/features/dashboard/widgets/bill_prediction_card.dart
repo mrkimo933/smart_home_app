@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/electricity_calculator.dart';
 import '../../../providers/consumption_provider.dart';
+import '../../../core/widgets/modern_card.dart';
 
 class BillPredictionCard extends ConsumerWidget {
   final double monthlyBudget;
@@ -32,111 +33,161 @@ class BillPredictionCard extends ConsumerWidget {
     final budgetProgress = (currentCost / monthlyBudget).clamp(0.0, 1.0);
     final isOverBudget = currentCost > monthlyBudget;
 
-    return Container(
+    return ModernCard(
+      borderRadius: 24,
+      backgroundColor: isOverBudget 
+          ? AppColors.cardColor 
+          : AppColors.cardColor,
+      border: isOverBudget
+          ? Border.all(
+              color: AppColors.errorRed.withOpacity(0.3),
+              width: 2,
+            )
+          : null,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.cardColor,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: isOverBudget ? AppColors.errorRed.withAlpha((0.3 * 255).toInt()) : Colors.transparent,
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Monthly Bill Prediction',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Monthly Bill Prediction',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isOverBudget ? 'Over Budget ⚠️' : 'On Track ✓',
+                    style: TextStyle(
+                      color: isOverBudget ? AppColors.errorRed : AppColors.successGreen,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-              Icon(
-                Icons.account_balance_wallet_rounded,
-                color: isOverBudget ? AppColors.errorRed : AppColors.primaryBlue,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isOverBudget 
+                      ? AppColors.errorRed.withOpacity(0.15)
+                      : AppColors.primaryBlue.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.account_balance_wallet_rounded,
+                  color: isOverBudget ? AppColors.errorRed : AppColors.primaryBlue,
+                  size: 24,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           isLoading
               ? const Center(child: CircularProgressIndicator())
-              : Row(
+              : Column(
                   children: [
-                    _buildInfoItem('Current', '${currentCost.toStringAsFixed(1)} EGP'),
-                    _buildDivider(),
-                    _buildInfoItem('Predicted', '${predictedBill.toStringAsFixed(1)} EGP'),
-                    _buildDivider(),
-                    _buildInfoItem('Usage', '${currentKwh.toStringAsFixed(1)} kWh'),
+                    Row(
+                      children: [
+                        _buildInfoItem('Current', '${currentCost.toStringAsFixed(1)} EGP', AppColors.accentOrange),
+                        const SizedBox(width: 12),
+                        _buildInfoItem('Predicted', '${predictedBill.toStringAsFixed(1)} EGP', AppColors.accentMagenta),
+                        const SizedBox(width: 12),
+                        _buildInfoItem('Usage', '${currentKwh.toStringAsFixed(1)} kWh', AppColors.primaryBlue),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Budget Progress',
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '${(budgetProgress * 100).toInt()}%',
+                              style: TextStyle(
+                                color: budgetProgress > 0.8 ? AppColors.errorRed : AppColors.accentTeal,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: LinearProgressIndicator(
+                            value: budgetProgress,
+                            minHeight: 10,
+                            backgroundColor: Colors.white.withOpacity(0.08),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              budgetProgress > 0.8 
+                                  ? AppColors.errorRed 
+                                  : AppColors.accentTeal,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-          const SizedBox(height: 20),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: budgetProgress,
-              minHeight: 8,
-              backgroundColor: Colors.white10,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                budgetProgress > 0.8 ? AppColors.errorRed : AppColors.accentGreen,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Budget: ${monthlyBudget.toInt()} EGP',
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-              ),
-              Text(
-                '${(budgetProgress * 100).toInt()}% Used',
-                style: TextStyle(
-                  color: budgetProgress > 0.8 ? AppColors.errorRed : AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoItem(String label, String value) {
+  Widget _buildInfoItem(String label, String value, Color accentColor) {
     return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: accentColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: accentColor.withOpacity(0.2),
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: accentColor.withOpacity(0.8),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Container(
-      height: 30,
-      width: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      color: Colors.white10,
     );
   }
 }
