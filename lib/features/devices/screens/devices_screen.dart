@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/widgets/modern_card.dart';
 import '../../../providers/devices_provider.dart';
 import '../../../providers/esp_provider.dart';
 import '../../../models/device.dart';
@@ -101,45 +102,31 @@ class DevicesScreen extends ConsumerWidget {
     final activeCount = devices.where((d) => d.isOn).length;
     final totalPower = devices.where((d) => d.isOn).fold(0.0, (sum, d) => sum + d.wattage);
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primaryBlue,
-            AppColors.primaryBlue.withAlpha((0.7 * 255).toInt()),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryBlue.withAlpha((0.3 * 255).toInt()),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
+    return ModernCard(
+      borderRadius: 24,
+      padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _buildSummaryStat(
                 '${devices.length}',
-                'Devices',
+                'Total',
                 Icons.devices_other_rounded,
+                AppColors.primaryBlue,
               ),
               _buildSummaryStat(
                 '$activeCount',
                 'Active',
                 Icons.power_rounded,
+                AppColors.accentOrange,
               ),
               _buildSummaryStat(
                 '${totalPower.toInt()}W',
                 'Usage',
                 Icons.bolt_rounded,
+                AppColors.accentTeal,
               ),
             ],
           ),
@@ -148,27 +135,48 @@ class DevicesScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSummaryStat(String value, String label, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon, color: Colors.white70, size: 20),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
+  Widget _buildSummaryStat(String value, String label, IconData icon, Color accentColor) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        decoration: BoxDecoration(
+          color: accentColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: accentColor.withOpacity(0.2),
           ),
         ),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white60,
-            fontSize: 12,
-          ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: accentColor, size: 20),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                color: accentColor.withOpacity(0.7),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 

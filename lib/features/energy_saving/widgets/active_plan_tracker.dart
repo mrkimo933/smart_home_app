@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/modern_card.dart';
 import '../../../providers/system_provider.dart';
 import '../../../providers/devices_provider.dart';
 import '../../../providers/consumption_provider.dart';
@@ -29,50 +31,57 @@ class ActivePlanTracker extends ConsumerWidget {
         ? const Color(0xFF00F5A0)
         : Colors.orange;
 
-    return Card(
-      color: const Color(0xFF1D1E33),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFF00B4D8), width: 1.5),
-      ),
+    return ModernCard(
+      borderRadius: 24,
       margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                Text(scenario.emoji, style: const TextStyle(fontSize: 24)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    scenario.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+      padding: const EdgeInsets.all(20),
+      backgroundColor: AppColors.cardColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.accentOrange.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(scenario.emoji, style: const TextStyle(fontSize: 24)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      scenario.name,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBlue.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.primaryBlue.withOpacity(0.4)),
+                      ),
+                      child: const Text(
+                        'الخطة النشطة',
+                        style: TextStyle(color: AppColors.primaryBlue, fontSize: 10, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF00B4D8).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF00B4D8)),
-                  ),
-                  child: const Text(
-                    'الخطة النشطة',
-                    style: TextStyle(color: Color(0xFF00B4D8), fontSize: 11),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Divider(color: Colors.white12),
-            const SizedBox(height: 12),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
 
             // Budget ring + stats row
             Row(
@@ -245,8 +254,8 @@ class ActivePlanTracker extends ConsumerWidget {
 
   Color _progressColor(double actual, double planned) {
     final ratio = planned > 0 ? actual / planned : 0.0;
-    if (ratio <= 0.8) return const Color(0xFF00F5A0);
-    if (ratio <= 1.0) return Colors.orange;
-    return const Color(0xFFFF4B4B);
+    if (ratio <= 0.8) return AppColors.accentTeal;
+    if (ratio <= 1.0) return AppColors.accentOrange;
+    return AppColors.errorRed;
   }
 }

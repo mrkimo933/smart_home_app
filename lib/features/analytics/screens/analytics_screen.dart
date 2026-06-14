@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/export_service.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/widgets/modern_card.dart';
 import '../../../providers/consumption_provider.dart';
 import '../../../providers/devices_provider.dart';
 import '../widgets/consumption_chart.dart';
@@ -145,22 +146,19 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
               textAlign: TextAlign.right,
             ),
             const SizedBox(height: 16),
-            Card(
-              color: AppColors.cardColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: historyAsync.when(
-                  data: (history) => ConsumptionChart(
-                    data: history,
-                    isDaily: _tabController.index == 0,
-                  ),
-                  loading: () => const SizedBox(
-                    height: 200,
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (e, _) => Center(child: Text('Error: $e')),
+            ModernCard(
+              borderRadius: 24,
+              padding: const EdgeInsets.all(20),
+              child: historyAsync.when(
+                data: (history) => ConsumptionChart(
+                  data: history,
+                  isDaily: _tabController.index == 0,
                 ),
+                loading: () => const SizedBox(
+                  height: 200,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (e, _) => Center(child: Text('Error: $e')),
               ),
             ),
             const SizedBox(height: 24),
@@ -212,13 +210,10 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> with SingleTi
               textAlign: TextAlign.right,
             ),
             const SizedBox(height: 16),
-            Card(
-              color: AppColors.cardColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: DevicePieChart(devices: devices),
-              ),
+            ModernCard(
+              borderRadius: 24,
+              padding: const EdgeInsets.all(24),
+              child: DevicePieChart(devices: devices),
             ),
             const SizedBox(height: 32),
           ],
@@ -319,56 +314,50 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: AppColors.cardColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          mainAxisAlignment: isWide ? MainAxisAlignment.spaceBetween : MainAxisAlignment.start,
-          children: [
-            if (isWide) ...[
+    final accentColor = title.contains('Cost') ? AppColors.accentOrange 
+        : title.contains('kWh') ? AppColors.primaryBlue 
+        : AppColors.accentTeal;
+
+    return ModernCard(
+      borderRadius: 18,
+      padding: const EdgeInsets.all(16),
+      backgroundColor: AppColors.cardColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
               Text(
-                value,
-                style: const TextStyle(
-                  color: AppColors.primaryBlue,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                title,
+                style: TextStyle(
+                  color: accentColor.withOpacity(0.8),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
                 ),
               ),
-              const SizedBox(width: 8),
-            ],
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(icon, color: AppColors.primaryBlue, size: 16),
-                  ],
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                if (!isWide) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ],
+                child: Icon(icon, color: accentColor, size: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

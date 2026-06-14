@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/modern_card.dart';
 import '../../../models/device.dart';
 import '../../../providers/esp_provider.dart';
 import '../../../providers/devices_provider.dart';
@@ -425,26 +426,32 @@ class DeviceCard extends ConsumerWidget {
         ),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: AppColors.cardColor,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(
               color: active
-                  ? const Color(0xFF00B4D8).withAlpha((0.6 * 255).toInt())
-                  : Colors.white.withAlpha((0.1 * 255).toInt()),
+                  ? AppColors.primaryBlue.withOpacity(0.5)
+                  : Colors.white.withOpacity(0.08),
               width: 1.5,
             ),
             boxShadow: active
                 ? [
                     BoxShadow(
-                      color: const Color(0xFF00B4D8).withAlpha((0.2 * 255).toInt()),
-                      blurRadius: 15,
-                      spreadRadius: 2,
-                      offset: const Offset(0, 4),
+                      color: AppColors.primaryBlue.withOpacity(0.2),
+                      blurRadius: 16,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 6),
                     )
                   ]
-                : [],
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    )
+                  ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/modern_card.dart';
 import '../../../models/device.dart';
 import '../../../models/schedule.dart';
 import '../../../providers/devices_provider.dart';
@@ -111,7 +112,8 @@ class _SchedulesScreenState extends ConsumerState<SchedulesScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddScheduleSheet(context, devices),
         backgroundColor: AppColors.primaryBlue,
-        child: const Icon(Icons.add, color: Colors.white),
+        elevation: 6,
+        child: const Icon(Icons.add, color: Colors.white, size: 28),
       ),
     );
   }
@@ -150,11 +152,23 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.schedule, size: 80, color: AppColors.textSecondary.withAlpha((0.5 * 255).toInt())),
-          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.primaryBlue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(Icons.schedule_rounded, size: 60, color: AppColors.primaryBlue),
+          ),
+          const SizedBox(height: 20),
           const Text(
             'لا توجد جداول زمنية مضافة',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'أنشئ جدول لتشغيل الأجهزة تلقائياً',
+            style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
           ),
         ],
       ),
@@ -289,23 +303,32 @@ class _TimePickerTile extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
         InkWell(
           onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(8),
-            ),
+          child: ModernCard(
+            borderRadius: 16,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            backgroundColor: AppColors.cardColor,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Icon(Icons.access_time, color: AppColors.primaryBlue, size: 18),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryBlue.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.access_time, color: AppColors.primaryBlue, size: 18),
+                ),
                 Text(
                   '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
-                  style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: AppColors.textPrimary, 
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
                 ),
               ],
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/widgets/modern_card.dart';
 import '../../../core/utils/electricity_calculator.dart';
 import '../../../models/device.dart';
 import '../../../providers/consumption_provider.dart';
@@ -22,90 +23,127 @@ class DevicePriorityCard extends ConsumerWidget {
     final deviceShare = recommendedDailyKwh / deviceCount;
     final recommendedHours = (deviceShare * 1000) / device.wattage;
 
-    return Card(
-      color: AppColors.cardColor,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                _buildPriorityBadge(device.priority),
-                const Spacer(),
-                Text(
-                  device.name,
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+    return ModernCard(
+      borderRadius: 20,
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      backgroundColor: AppColors.cardColor,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _getPriorityColor(device.priority).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 12),
-                Icon(_getIconData(device.icon), color: AppColors.primaryBlue),
-              ],
+                child: Icon(_getIconData(device.icon), color: _getPriorityColor(device.priority), size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      device.name,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _buildPriorityBadge(device.priority),
+                  ],
+                ),
+              ),
+              _buildPrioritySelector(context, ref),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.accentTeal.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.accentTeal.withOpacity(0.2)),
             ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildPrioritySelector(context, ref),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
                       'الاستخدام الموصى به',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                     Text(
-                      '${recommendedHours.toStringAsFixed(1)} ساعة/يوم',
-                      style: const TextStyle(color: AppColors.accentGreen, fontSize: 14),
+                      '${recommendedHours.toStringAsFixed(1)} س/يوم',
+                      style: const TextStyle(color: AppColors.accentTeal, fontSize: 12, fontWeight: FontWeight.w700),
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Text(
-                  'الاستخدام اليومي الحالي',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                ),
-                const SizedBox(height: 4),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: (device.totalOnMinutesToday / 60) / recommendedHours.clamp(0.1, 24.0),
-                    backgroundColor: AppColors.background,
-                    color: AppColors.primaryBlue,
-                    minHeight: 6,
+          ),
+          const SizedBox(height: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'الاستخدام اليومي الحالي',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600),
                   ),
+                  Text(
+                    '${((device.totalOnMinutesToday / 60) / recommendedHours.clamp(0.1, 24.0) * 100).toStringAsFixed(0)}%',
+                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 11, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: LinearProgressIndicator(
+                  value: (device.totalOnMinutesToday / 60) / recommendedHours.clamp(0.1, 24.0),
+                  backgroundColor: Colors.white.withOpacity(0.08),
+                  minHeight: 8,
+                  valueColor: AlwaysStoppedAnimation<Color>(_getPriorityColor(device.priority)),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
+  Color _getPriorityColor(DevicePriority priority) {
+    switch (priority) {
+      case DevicePriority.essential:
+        return AppColors.accentTeal;
+      case DevicePriority.normal:
+        return AppColors.primaryBlue;
+      case DevicePriority.nonEssential:
+        return AppColors.accentOrange;
+    }
+  }
+
   Widget _buildPriorityBadge(DevicePriority priority) {
-    Color color;
+    final color = _getPriorityColor(priority);
     String label;
     switch (priority) {
       case DevicePriority.essential:
-        color = AppColors.accentGreen;
         label = 'أساسي';
         break;
       case DevicePriority.normal:
-        color = AppColors.primaryBlue;
         label = 'عادي';
         break;
       case DevicePriority.nonEssential:
-        color = Colors.orange;
         label = 'ثانوي';
         break;
     }
@@ -113,13 +151,13 @@ class DevicePriorityCard extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withAlpha((0.2 * 255).toInt()),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color, width: 0.5),
+        color: color.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withOpacity(0.4), width: 1),
       ),
       child: Text(
         label,
-        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -132,14 +170,16 @@ class DevicePriorityCard extends ConsumerWidget {
           device.copyWith(priority: priority),
         );
       },
-      child: const Row(
-        children: [
-          Icon(Icons.arrow_drop_down, color: AppColors.textSecondary),
-          Text(
-            'تغيير الأولوية',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-          ),
-        ],
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: AppColors.cardColor,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: const Icon(Icons.edit_outlined, color: AppColors.textSecondary, size: 18),
       ),
       itemBuilder: (context) => const [
         PopupMenuItem(value: DevicePriority.essential, child: Text('أساسي')),
